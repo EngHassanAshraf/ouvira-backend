@@ -4,7 +4,6 @@ db.sqlite3
 .env
 venv/
 
-migrations/
 staticfiles/
 entrprise_service/
 
