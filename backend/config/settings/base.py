@@ -42,7 +42,8 @@ SHARED_THIRD_PARTY = (
     "drf_yasg",
 )
 
-SHARED_CREATED_APPS = (    "apps.tenant",
+SHARED_CREATED_APPS = (    
+    "apps.tenant",
     "apps.identity.account",
     "apps.identity.auth_app",
     "apps.audit",
@@ -54,7 +55,16 @@ SHARED_APPS = [*DEFAULT_APPS, *SHARED_THIRD_PARTY, *SHARED_CREATED_APPS]
 
 TENANT_CREATED_APPS = (
     "apps.core",
-    "apps.hris",
+
+    # hris/modules
+    "apps.hris.core",
+    'apps.hris.leave_management',
+    'apps.hris.recruitment',
+    'apps.hris.travel_management',
+    'apps.hris.expense_management',
+    'apps.hris.performance',
+    'apps.hris.termination',
+    'apps.hris.analytics',
 )
 
 TENANT_THIRD_PARTY = ()
