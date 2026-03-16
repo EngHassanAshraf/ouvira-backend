@@ -33,27 +33,31 @@ DEFAULT_APPS = (
     "django.contrib.staticfiles",
 )
 
-SHARED_THIRD_PARTY = ("django_tenants", "corsheaders")
+SHARED_THIRD_PARTY = (    
+    "django_tenants",
+    "corsheaders",
+    "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
+    "drf_yasg",
+)
 
-SHARED_CREATED_APPS = ("apps.identity.account", "apps.tenant")
+SHARED_CREATED_APPS = (    "apps.tenant",
+    "apps.identity.account",
+    "apps.identity.auth_app",
+    "apps.audit",
+    "apps.access_control",
+    "apps.company",
+    )
 
 SHARED_APPS = [*DEFAULT_APPS, *SHARED_THIRD_PARTY, *SHARED_CREATED_APPS]
 
 TENANT_CREATED_APPS = (
     "apps.core",
-    "apps.audit",
-    "apps.access_control",
-    "apps.company",
-    "apps.identity.auth_app",
     "apps.hris",
 )
 
-TENANT_THIRD_PARTY = (
-    "drf_yasg",
-    "rest_framework",
-    "rest_framework_simplejwt",
-    "rest_framework_simplejwt.token_blacklist",
-)
+TENANT_THIRD_PARTY = ()
 
 TENANT_APPS = [*TENANT_THIRD_PARTY, *TENANT_CREATED_APPS]
 
@@ -246,7 +250,7 @@ LOGGING = {
 
 # === EXTERNAL SERVICE KEYS ===
 
-# === SEND SMS ===
+# === SMS SERVICE CONF ===
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
@@ -255,20 +259,16 @@ VONAGE_KEY = os.getenv("VONAGE_KEY")
 VONAGE_API_SECRET = os.getenv("VONAGE_API_SECRET")
 
 
-# === TURNSTILE ===
-TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY")
-TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
-
-# === SEND EMAIL ===
-# === SEND EMAIL ===
+# === EMAIL SERVICE CONF ===
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))  # int() qo'shildi
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"  # Boolean tekshiruvi
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587)) 
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
 
-
-
+# === TURNSTILE ===
+TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY")
+TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")

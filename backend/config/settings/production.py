@@ -2,7 +2,7 @@
 Production settings.
 """
 import sys
-from .base import *  # noqa: F401,F403
+from .base import *
 
 DEBUG = False
 
@@ -55,5 +55,5 @@ SECURE_HSTS_PRELOAD = True
 # If behind Nginx / Cloudflare / Proxy
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 

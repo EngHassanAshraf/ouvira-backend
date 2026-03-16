@@ -38,7 +38,7 @@ from apps.identity.account.services import UserService
 from apps.shared.exceptions import BusinessException
 from apps.shared.messages.error import ERROR_MESSAGES
 from apps.shared.messages.success import SUCCESS_MESSAGES
-from apps.notifications.sms import send_sms
+from apps.shared.services.sms_service import send_sms
 
 logger = logging.getLogger(__name__)
 

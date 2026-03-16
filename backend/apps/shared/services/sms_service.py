@@ -4,7 +4,6 @@ from django.conf import settings
 from rest_framework import response
 
 from vonage import Auth, Vonage
-import vonage
 from vonage_sms import SmsMessage, SmsResponse
 from vonage_http_client.errors import HttpRequestError
 
