@@ -25,33 +25,28 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 # === APPLICATION DEFINITION ===
 
 DEFAULT_APPS = (
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "django.contrib.staticfiles",
 )
 
-SHARED_THIRD_PARTY = (    
+SHARED_APPS = [    
     "django_tenants",
+    "django.contrib.contenttypes",
+    "django.contrib.auth",
+    "apps.tenant",
+    "apps.identity.account",
+    "apps.identity.auth_app",
+    "django.contrib.admin",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",    
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "drf_yasg",
-)
-
-SHARED_CREATED_APPS = (    
-    "apps.tenant",
-    "apps.identity.account",
-    "apps.identity.auth_app",
+    "apps.company",
     "apps.audit",
     "apps.access_control",
-    "apps.company",
-    )
-
-SHARED_APPS = [*DEFAULT_APPS, *SHARED_THIRD_PARTY, *SHARED_CREATED_APPS]
+    ]
 
 TENANT_CREATED_APPS = (
     "apps.core",
