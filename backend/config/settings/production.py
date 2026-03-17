@@ -3,6 +3,7 @@ Production settings.
 """
 import sys
 from .base import *
+from corsheaders.defaults import default_headers
 
 DEBUG = False
 
@@ -23,6 +24,10 @@ CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
     if origin.strip()
+]
+CORS_ALLOW_HEADERS = [
+    *default_headers,
+    "x-tenant",
 ]
 
 # CSRF — trust your frontend domains
