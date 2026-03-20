@@ -19,12 +19,12 @@ class Employee(TimeStampedModel, SoftDeleteModel):
     # Hassan yozgan bazaviy ulanishlar
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="employee_profile",
         blank=True,
         null=True,
     )
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="employees")
+    company = models.ForeignKey(Company, on_delete=models.SET_NULL, related_name="employees")
 
     # Asosiy ma'lumotlar
     employee_id = models.CharField(max_length=50, verbose_name=_("Employee ID"))  # Masalan: EMP-001
