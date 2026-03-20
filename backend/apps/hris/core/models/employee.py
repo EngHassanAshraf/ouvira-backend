@@ -24,7 +24,7 @@ class Employee(TimeStampedModel, SoftDeleteModel):
         blank=True,
         null=True,
     )
-    company = models.ForeignKey(Company, on_delete=models.SET_NULL, related_name="employees")
+    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="employees")
 
     # Asosiy ma'lumotlar
     employee_id = models.CharField(max_length=50, verbose_name=_("Employee ID"))  # Masalan: EMP-001
