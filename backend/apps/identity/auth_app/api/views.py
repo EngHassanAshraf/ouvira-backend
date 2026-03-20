@@ -68,7 +68,7 @@ class SignUPView(APIView):
             otp = OTPService.create_otp(phone_number)
             
             # Send SMS
-            send_sms(message=f"Your OTP code is {otp.otp_code}", phone=phone_number)
+            # send_sms(message=f"Your OTP code is {otp.otp_code}", phone=phone_number)
             return Response(
                 {
                     "status": "success",
