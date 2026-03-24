@@ -25,6 +25,7 @@ urlpatterns = [
     path("api/account/", include("apps.identity.account.api.urls")),
     path("api/company/", include("apps.company.api.urls")),
     path("api/audit/", include("apps.audit.api.urls")),
+    path('api/hris/', include('apps.hris.base.urls')),  # 'apps.'siz yozib ko'ring
     path("admin/", admin.site.urls),
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",

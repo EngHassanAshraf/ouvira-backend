@@ -3,5 +3,4 @@ from django.apps import AppConfig
 
 class CoreConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'apps.hris.core'
-    label = "hris_core"
+    name = 'apps.hris.hris_core'

@@ -52,7 +52,7 @@ TENANT_CREATED_APPS = (
     "apps.core",
 
     # hris/modules
-    "apps.hris.core",
+    "apps.hris.hris_core",
     'apps.hris.leave_management',
     'apps.hris.recruitment',
     'apps.hris.travel_management',

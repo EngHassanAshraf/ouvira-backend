@@ -16,6 +16,7 @@ class Location(TimeStampedModel, SoftDeleteModel):
     address = models.TextField(blank=True, null=True, verbose_name=_("Address"))
     city = models.CharField(max_length=100, blank=True, null=True, verbose_name=_("City"))
     country = models.CharField(max_length=100, default="Saudi Arabia", verbose_name=_("Country"))
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "hris_locations"
