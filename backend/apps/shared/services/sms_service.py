@@ -23,11 +23,9 @@ def send_sms(phone: str, message: str, from_number: str = None) -> bool:
 
         if responseData.messages[0].status == "0":
             logger.info("SMS sent successfully to %s", phone)
-            print("Message sent successfully.")
             return True
         else:
-            logger.error("SMS failed to %s: %s", phone, response.messages[0].error_text)
-            print("Message sent successfully.")
+            logger.error("SMS failed to %s: %s", phone, responseData.messages[0].error_text)
             return False
 
         # client = Client(

@@ -44,45 +44,6 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/verify-otp/`
-**Auth:** None | **Rate:** 5/min
-
-**Request:**
-```json
-{
-  "primary_mobile": "+201234567890",
-  "otp": "123456"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "OTP verified successfully",
-  "primary_mobile": "+201234567890"
-}
-```
-
----
-
-### POST `/api/auth/resent-otp/`
-**Auth:** None | **Rate:** 3/hour
-
-**Request:**
-```json
-{
-  "primary_mobile": "+201234567890"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "OTP resent successfully"
-}
-```
-
----
 
 ### POST `/api/auth/finalize-signin/`
 **Auth:** None | **Rate:** 3/hour
@@ -254,7 +215,191 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-# 2. Access Control — `api/access-control/`
+### POST `/api/auth/otp/send/`
+**Auth:** None | **Rate:** 1/min
+> Submits an OTP via email or SMS depending on the detected format of the `identifier`.
+
+**Request:**
+```json
+{
+  "identifier": "hassan@example.com"
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "OTP sent successfully"
+}
+```
+
+---
+
+### POST `/api/auth/otp/verify/`
+**Auth:** None | **Rate:** 5/min
+> Validates the OTP securely (HMAC) and returns a success payload, advancing the user to login or finalized-signup.
+
+**Request:**
+```json
+{
+  "identifier": "hassan@example.com",
+  "otp": "123456"
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "OTP verified successfully"
+}
+```
+
+---
+
+### POST `/api/auth/password/forgot/`
+**Auth:** None | **Rate:** 3/hour
+
+**Request:**
+```json
+{
+  "identifier": "hassan@example.com"
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "If an account with that identifier exists, a password reset link has been sent."
+}
+```
+
+---
+
+### GET `/api/auth/password/validate-reset-token/`
+**Auth:** None | **Rate:** Rate-limited at ingress
+
+**Request Query Param:**
+`?token=b4b2c1d3...`
+
+**Response (200):**
+```json
+{
+  "valid": true
+}
+```
+
+---
+
+### POST `/api/auth/password/reset/`
+**Auth:** None | **Rate:** 3/hour (Shared with forgot)
+
+**Request:**
+```json
+{
+  "token": "b4b2c1d3...",
+  "new_password": "NewSecurePassword123!"
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "Password reset successfully"
+}
+```
+
+---
+
+### POST `/api/auth/password/change/`
+**Auth:** Bearer Token | **Rate:** 10/hour
+
+**Request:**
+```json
+{
+  "old_password": "CurrentSecurePassword123!",
+  "new_password": "NewSecurePassword123!"
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "Password updated successfully"
+}
+```
+
+---
+
+# 2. Account Management — `api/account/`
+
+---
+
+### GET `/api/account/profile/`
+**Auth:** Bearer Token
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "username": "hassan",
+  "full_name": "Hassan Ashraf",
+  "email": "hassan@example.com",
+  "primary_mobile": "+201234567890",
+  "email_verified": true,
+  "phone_verified": true,
+  "account_uid": "USR-1234ABCD",
+  "is_2fa_enabled": false,
+  "two_fa_type": "AUTHENTICATOR",
+  "date_joined": "2026-01-15T10:00:00Z",
+  "last_login": "2026-03-24T22:00:00Z"
+}
+```
+
+---
+
+### PUT/PATCH `/api/account/profile/`
+**Auth:** Bearer Token
+
+**Request:**
+```json
+{
+  "full_name": "Hassan Ashraf",
+  "email": "hassan-updated@example.com"
+}
+```
+
+**Response (200):**
+_Returns full user profile json block._
+
+---
+
+### GET `/api/account/users/`
+**Auth:** Bearer + Admin
+> Lists all active system users. Intended for administrative directory lookups. Optionally filter by `?company=<id>`.
+
+**Response (200):**
+```json
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "username": "hassan",
+      "full_name": "Hassan Ashraf",
+      "email": "hassan@example.com",
+      "primary_mobile": "+201234567890",
+      "is_active": true,
+      "date_joined": "2026-01-15T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+# 3. Access Control — `api/access-control/`
 
 ---
 
