@@ -50,9 +50,9 @@ class AuthService:
             )
             
             if created:
-                logger.info(f"New user created: {phone_number}")
+                logger.info("New user created | user_id=%s", user.pk)
             else:
-                logger.info(f"Existing user retrieved: {phone_number}")
+                logger.info("Existing user retrieved | user_id=%s", user.pk)
             
             return user, created
             
@@ -61,28 +61,23 @@ class AuthService:
             raise
 
     @staticmethod
-    def verify_phone_number(phone_number: str) -> CustomUser:
+    def verify_user_otp(identifier: str, otp_code: str):
         """
-        Mark user's phone number as verified.
-        
-        Args:
-            phone_number: Phone number to verify
-            
-        Returns:
-            User instance
-            
-        Raises:
-            BusinessException: If user not found
+        Coordinates OTP verification and updates user state.
+        Returns the user object on success.
         """
-        user = CustomUser.objects.filter(primary_mobile=phone_number).first()
-        
-        if not user:
-            raise BusinessException(ERROR_MESSAGES["ACCOUNT_NOT_FOUND"])
-        
-        user.phone_verified = True
-        user.save(update_fields=["phone_verified"])
-        
-        logger.info(f"Phone number verified for user: {phone_number}")
+        channel = OTPService.verify(identifier, otp_code)
+
+        user = AuthService.get_user_by_identifier(identifier)
+        if user:
+            if channel == "email":
+                user.email_verified = True
+                user.save(update_fields=["email_verified"])
+            else:
+                user.phone_verified = True
+                user.save(update_fields=["phone_verified"])
+
+        logger.info("User OTP verified | identifier=%s", identifier)
         return user
 
     @staticmethod
@@ -166,5 +161,5 @@ class AuthService:
         user.set_password(password)
         user.save(update_fields=["email", "password"])
         
-        logger.info(f"Signup finalized for user: {user.primary_mobile}")
+        logger.info("Signup finalized | user_id=%s", user.pk)
         return user

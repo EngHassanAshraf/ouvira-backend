@@ -29,12 +29,15 @@ class AccountService:
         Password changes go through a separate flow.
         """
         allowed_fields = {"full_name", "email"}
+        updated = []
         for key, value in data.items():
             if key in allowed_fields:
                 setattr(user, key, value)
+                updated.append(key)
 
-        user.save()
-        logger.info(f"Profile updated for user {user.username}")
+        if updated:
+            user.save(update_fields=updated)
+        logger.info("Profile updated for user %s", user.pk)
         return user
 
     @staticmethod
@@ -56,25 +59,3 @@ class AccountService:
 
         return qs.order_by("-date_joined")
 
-    @staticmethod
-    def update_existing_user(**data) -> CustomUser:
-        """
-        Update an existing user found by phone number.
-        Used during OTP-based signup finalization.
-        """
-        primary_mobile = data.get("primary_mobile")
-        user = CustomUser.objects.filter(primary_mobile=primary_mobile).first()
-
-        if not user:
-            raise BusinessException(ERROR_MESSAGES["ACCOUNT_NOT_FOUND"])
-
-        password = data.pop("password", None)
-
-        for key, value in data.items():
-            setattr(user, key, value)
-
-        if password:
-            user.set_password(password)
-        user.save()
-
-        return user

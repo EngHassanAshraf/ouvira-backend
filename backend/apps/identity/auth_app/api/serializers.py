@@ -215,17 +215,16 @@ class LoginSerializer(serializers.Serializer):
             if not token or not verify_turnstile(token):
                 raise serializers.ValidationError("Invalid Turnstile token")
 
-        # Get user by identifier
         from ..services.auth_service import AuthService
-        user = AuthService.get_user_by_identifier(identifier)
+        
+        # Delegate to AuthService for secure authentication (handles lockout, failed counts, resets)
+        user = AuthService.authenticate_user(identifier, password)
         
         if not user:
-            raise serializers.ValidationError(
-                "Username/Phone/Email/Password is incorrect"
-            )
-        
-        # Verify password
-        if not user.check_password(password):
+            # Check if reason is lockout to return accurate error, otherwise generic
+            raw_user = AuthService.get_user_by_identifier(identifier)
+            if raw_user and raw_user.is_locked():
+                raise serializers.ValidationError("Account is locked due to too many failed attempts. Try again later.")
             raise serializers.ValidationError(
                 "Username/Phone/Email/Password is incorrect"
             )
@@ -282,3 +281,48 @@ class TwoFABackupVerifySerializer(serializers.Serializer):
         max_length=100,
         help_text="Backup code for 2FA"
     )
+
+
+class SendOTPSerializer(serializers.Serializer):
+    """POST /api/auth/otp/send/ — channel auto-detected from identifier format."""
+    identifier = serializers.CharField(
+        max_length=255,
+        help_text="Email address or phone number. Channel (email/SMS) is auto-detected.",
+    )
+
+
+class VerifyOTPSerializer(serializers.Serializer):
+    """POST /api/auth/otp/verify/"""
+    identifier = serializers.CharField(max_length=255)
+    otp = serializers.CharField(
+        min_length=6,
+        max_length=6,
+        validators=[RegexValidator(r"^\d{6}$", "OTP must be exactly 6 digits")],
+    )
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    """POST /api/auth/password/forgot/"""
+    identifier = serializers.CharField(
+        max_length=255,
+        help_text="Email address or phone number.",
+    )
+
+
+class ValidateResetTokenSerializer(serializers.Serializer):
+    """GET /api/auth/password/validate-reset-token/?token=..."""
+    token = serializers.CharField(min_length=64, max_length=64)
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    """POST /api/auth/password/reset/"""
+    token = serializers.CharField(min_length=64, max_length=64)
+    new_password = serializers.CharField(min_length=8, max_length=40, write_only=True)
+    confirm_password = serializers.CharField(min_length=8, max_length=40, write_only=True)
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """POST /api/auth/password/change/"""
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(min_length=8, max_length=40, write_only=True)
+    confirm_password = serializers.CharField(min_length=8, max_length=40, write_only=True)

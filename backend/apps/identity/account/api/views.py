@@ -43,14 +43,18 @@ class UserListView(ListAPIView):
 
     def get_queryset(self):
         company_id = self.request.query_params.get("company")
-        return AccountService.list_users(
-            company_id=int(company_id) if company_id else None,
-        )
+        if company_id is not None:
+            try:
+                company_id = int(company_id)
+            except (ValueError, TypeError):
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"error": "invalid company_id — must be an integer"})
+        return AccountService.list_users(company_id=company_id)
 
 
 class SessionTestAPIView(APIView):
     """Session/token inspection endpoint for debugging."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     authentication_classes = [JWTAuthentication]
 
     def get(self, request):
