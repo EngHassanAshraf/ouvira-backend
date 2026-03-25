@@ -1,10 +1,12 @@
+from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
 from apps.hris.hris_core.selectors import LocationSelector, OrganizationSelector
-from apps.hris.hris_core.services import LocationService, OrganizationService
-from apps.hris.hris_core.api.serializers import LocationSerializers
+from apps.hris.hris_core.services import LocationService, OrganizationService, EmployeeService
+from apps.hris.hris_core.api.serializers import LocationSerializers, EmployeeListSerializer, EmployeeCreateSerializer
+from apps.hris.hris_core.selectors.employee_selectors import EmployeeSelector
 
 
 class LocationListCreateApiView(APIView):
@@ -32,3 +34,32 @@ class LocationListCreateApiView(APIView):
             )
             return Response(LocationSerializers(location).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+#______________________________________________________
+# Employee List Create Api View
+#_______________________________________________________
+
+class EmployeeListCreateApiView(APIView):
+    permission_classes = [AllowAny]  # FAQAT TEST UCHUN!
+    serializer_class = EmployeeCreateSerializer
+    def get(self, request):
+        company_id = request.tenant.id
+        employess = EmployeeSelector.get_employee_by_company(company_id=company_id)
+        serializer = EmployeeListSerializer(employess, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = EmployeeCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        company_id = request.tenant.id
+        #Servis orqali hodim yaratamiz
+        # create employees throught the servise
+        employee = EmployeeService.create_employee(
+            company_id = company_id,
+            **serializer.validated_data
+        )
+        return  Response(
+            EmployeeListSerializer(employee).data,
+            status=status.HTTP_201_CREATED
+        )
