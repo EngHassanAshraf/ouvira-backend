@@ -273,6 +273,8 @@ TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
 VONAGE_KEY = os.getenv("VONAGE_KEY")
 VONAGE_API_SECRET = os.getenv("VONAGE_API_SECRET")
 
+INFOBIP_API_KEY = os.getenv("INFOBIP_API_KEY")
+
 
 # === EMAIL SERVICE CONF ===
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")

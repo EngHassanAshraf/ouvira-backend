@@ -104,21 +104,21 @@ class OTPService:
 
         # AUTH-006: Wrap delete + create in a single atomic block so a failed create
         # cannot leave the user with no active OTP record.
+        print(f"{'='*10} raw otp", raw_otp)
         with transaction.atomic():
             # Purge any previous unverified record for this identifier
             OTPRecord.objects.filter(identifier=identifier, is_verified=False).delete()
 
-            OTPRecord.objects.create(
+            otp = OTPRecord.objects.create(
                 identifier=identifier,
                 channel=channel,
                 otp_hash=otp_hash,
                 expires_at=expires_at,
             )
-
+        logger.info("OTP issued | channel=%s | identifier=<redacted>", channel)
         # Dispatch delivery asynchronously — import here to avoid circular imports
         OTPService._dispatch(channel, identifier, raw_otp)
 
-        logger.info("OTP issued | channel=%s | identifier=<redacted>", channel)
 
     # --------- Dispatch OTP delivery ---------
 
@@ -129,12 +129,17 @@ class OTPService:
             try:
                 from apps.identity.auth_app.tasks.send_otp_email import send_otp_email
                 send_otp_email.delay(identifier, raw_otp)
+                logger.info("OTP sent | channel=%s | identifier=<redacted>", channel)
             except Exception:
                 logger.exception("Failed to enqueue OTP email | identifier=<redacted>")
         else:
             try:
                 from apps.shared.services.sms_service import send_sms
-                send_sms(message=f"Your Ouvira OTP is: {raw_otp}. Expires in 10 minutes.", phone=identifier)
+                sent = send_sms(message=f"Your Ouvira OTP is: {raw_otp}. Expires in 10 minutes.", phone=identifier)
+                if sent:
+                    logger.info("OTP sent | channel=%s | identifier=<redacted>", channel)
+                else:
+                    logger.error("Failed to send OTP SMS | identifier=<redacted>")
             except Exception:
                 logger.exception("Failed to send OTP SMS | identifier=<redacted>")
 
