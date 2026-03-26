@@ -109,33 +109,33 @@ class FinalizeSignInSerializer(serializers.Serializer):
 
 # ==================== OTP SERIALIZERS ====================
 
-class OTPVerifySerializer(serializers.Serializer):
-    """Serializer for OTP verification"""
-    primary_mobile = serializers.CharField(
-        max_length=13, 
-        allow_blank=False,
-        help_text="Phone number associated with OTP"
-    )
-    otp_code = serializers.CharField(
-        min_length=6,
-        max_length=6,
-        allow_blank=False,
-        validators=[
-            RegexValidator(
-                regex=r"^\d{6}$", 
-                message="OTP code must be exactly 6 digits"
-            )
-        ],
-        help_text="6-digit OTP code"
-    )
+# class OTPVerifySerializer(serializers.Serializer):
+#     """Serializer for OTP verification"""
+#     primary_mobile = serializers.CharField(
+#         max_length=13, 
+#         allow_blank=False,
+#         help_text="Phone number associated with OTP"
+#     )
+#     otp_code = serializers.CharField(
+#         min_length=6,
+#         max_length=6,
+#         allow_blank=False,
+#         validators=[
+#             RegexValidator(
+#                 regex=r"^\d{6}$", 
+#                 message="OTP code must be exactly 6 digits"
+#             )
+#         ],
+#         help_text="6-digit OTP code"
+#     )
 
-    def validate_primary_mobile(self, value):
-        """Validate phone number format"""
-        try:
-            validate_user_mobile(value)
-        except ValidationError as e:
-            raise serializers.ValidationError(e.messages)
-        return value
+#     def validate_primary_mobile(self, value):
+#         """Validate phone number format"""
+#         try:
+#             validate_user_mobile(value)
+#         except ValidationError as e:
+#             raise serializers.ValidationError(e.messages)
+#         return value
 
 
 class ResentOTPSerializer(serializers.Serializer):

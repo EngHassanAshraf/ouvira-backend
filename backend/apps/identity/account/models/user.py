@@ -24,6 +24,7 @@ class CustomUser(AbstractUser, TimeStampedModel, SoftDeleteModel):
 
     email_verified = models.BooleanField(default=False)
     phone_verified = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=False)
     account_uid = models.CharField(max_length=20, unique=True, blank=True)
 
     is_2fa_enabled = models.BooleanField(default=False)
