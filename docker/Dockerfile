@@ -38,11 +38,11 @@ COPY ./docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 ARG MAXMIND_LICENSE_KEY
 RUN mkdir -p /var/opt/geoip && \
     if [ -n "$MAXMIND_LICENSE_KEY" ]; then \
-        echo "Downloading GeoLite2-City..." && \
-        curl -Ls --fail "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" \
-        | tar -xz --strip-components=1 -C /var/opt/geoip --wildcards "*.mmdb"; \
+    echo "Downloading GeoLite2-City..." && \
+    curl -Ls --fail "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" \
+    | tar -xz --strip-components=1 -C /var/opt/geoip --wildcards "*.mmdb"; \
     else \
-        echo "MAXMIND_LICENSE_KEY not set. GeoIP will gracefully fallback."; \
+    echo "MAXMIND_LICENSE_KEY not set. GeoIP will gracefully fallback."; \
     fi
 
 # Fix permissions
