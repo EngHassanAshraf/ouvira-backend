@@ -48,14 +48,12 @@ class AuthService:
                     "username": AuthService.generate_username(full_name),
                 },
             )
-            
             if created:
                 logger.info("New user created | user_id=%s", user.pk)
             else:
                 logger.info("Existing user retrieved | user_id=%s", user.pk)
             
             return user, created
-            
         except IntegrityError as e:
             logger.error(f"Integrity error during signup for {phone_number}: {str(e)}")
             raise
@@ -70,12 +68,13 @@ class AuthService:
 
         user = AuthService.get_user_by_identifier(identifier)
         if user:
+            user.is_active = True
             if channel == "email":
                 user.email_verified = True
-                user.save(update_fields=["email_verified"])
+                user.save(update_fields=["email_verified", "is_active"])
             else:
                 user.phone_verified = True
-                user.save(update_fields=["phone_verified"])
+                user.save(update_fields=["phone_verified", "is_active"])
 
         logger.info("User OTP verified | identifier=%s", identifier)
         return user

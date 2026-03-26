@@ -80,11 +80,10 @@ class SignUPView(APIView):
         phone_number = serializer.validated_data.get("primary_mobile")
         full_name = serializer.validated_data.get("full_name")
 
-
         try:
             # Create or get user
             user, created = AuthService.signup_user(phone_number, full_name)
-            
+
             # Generate and send OTP
             OTPService.generate_and_send(phone_number)
             return Response(
@@ -184,7 +183,7 @@ class FinalizeSignInView(APIView):
             # Get user
             user = AuthService.get_user_by_identifier(primary_mobile)
             
-            if not user:
+            if not user or not user.is_active or not user.phone_verified:
                 return Response(
                     {
                         "status": "error",
