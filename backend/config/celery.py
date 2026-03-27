@@ -15,5 +15,10 @@ app = Celery("config")
 # Read Celery config from Django settings (CELERY_* namespace)
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
-# Auto-discover tasks from all INSTALLED_APPS
-app.autodiscover_tasks()
+# Auto-discover tasks from all INSTALLED_APPS after Django is configured
+app.autodiscover_tasks(["apps.identity.auth_app"])
+# @app.on_after_configure.connect
+# def setup_autodiscover(sender, **kwargs):
+#     import django
+#     django.setup()
+#     sender.autodiscover_tasks()
