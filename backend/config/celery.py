@@ -2,7 +2,6 @@
 Celery application configuration.
 Auto-discovers tasks from all INSTALLED_APPS.
 """
-from backend.config.asgi import django_env
 import os
 import django
 from celery import Celery

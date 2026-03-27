@@ -1,8 +1,8 @@
 [build]
 builder = "nixpacks"
-buildCommand = "cd .. && pip install -r requirements.txt"
+buildCommand = "pip install -r ../requirements.txt"
 
 # cache bust: 1
 
 [deploy]
-startCommand = "cd /app/backend && /opt/venv/bin/celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
+startCommand = "celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
