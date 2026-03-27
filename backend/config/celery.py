@@ -2,7 +2,9 @@
 Celery application configuration.
 Auto-discovers tasks from all INSTALLED_APPS.
 """
+from backend.config.asgi import django_env
 import os
+import django
 from celery import Celery
 
 # DJANGO_SETTINGS_MODULE must be set BEFORE importing anything from Django.
@@ -16,8 +18,5 @@ app = Celery("config")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Auto-discover tasks from all INSTALLED_APPS after Django is configured
-@app.on_after_configure.connect
-def setup_autodiscover(sender, **kwargs):
-    import django
-    django.setup()
-    sender.autodiscover_tasks()
+django.setup()
+app.autodiscover_tasks()
