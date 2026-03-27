@@ -1,0 +1,9 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pip install -r ../requirements.txt"
+
+# cache bust: 1
+
+[deploy]
+startCommand = "celery -A config worker --loglevel=info --queues=default,fast --concurrency=2 "
+healthcheckPath = ""
