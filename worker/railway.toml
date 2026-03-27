@@ -5,5 +5,5 @@ buildCommand = "pip install -r ../requirements.txt"
 # cache bust: 1
 
 [deploy]
-startCommand = "celery -A config worker --loglevel=info --queues=default,fast --concurrency=2 "
+startCommand = "cd /app/backend && celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
 healthcheckPath = ""
