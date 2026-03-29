@@ -289,7 +289,7 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 # === TURNSTILE ===
 TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY")
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
-TURNSTILE_BYPASS_TOKEN = os.getenv("TURNSTILE_BYPASS_TOKEN")
+TURNSTILE_BYPASS_TOKEN = os.getenv("TURNSTILE_BYPASS_TOKEN", "")
 
 
 # === CELERY (JSON serializer prevents pickle deserialization attacks) ===
