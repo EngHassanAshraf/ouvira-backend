@@ -3,7 +3,6 @@ Celery application configuration.
 Auto-discovers tasks from all INSTALLED_APPS.
 """
 import os
-import django
 from celery import Celery
 
 # DJANGO_SETTINGS_MODULE must be set BEFORE importing anything from Django.
@@ -15,7 +14,11 @@ app = Celery("config")
 
 # Read Celery config from Django settings (CELERY_* namespace)
 app.config_from_object("django.conf:settings", namespace="CELERY")
-
 # Auto-discover tasks from all INSTALLED_APPS after Django is configured
-django.setup()
 app.autodiscover_tasks()
+
+# @app.on_after_finalize.connect
+# def autodiscover(sender, **kwargs):
+#     sender.autodiscover_tasks([
+#         "apps.identity.auth_app",
+#     ])
