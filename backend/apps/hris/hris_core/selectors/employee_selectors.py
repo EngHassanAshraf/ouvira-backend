@@ -18,3 +18,8 @@ class EmployeeSelector:
         Bitta xodim haqida to'liq malumot.
         """
         return Employee.objects.get(id=employee_id, company_id=company_id)
+
+    def get_detail(self, employee_id: int, company_id: int)-> Employee:
+        return Employee.objects.select_related(
+            "location", "department", "user"
+        ).get(id=employee_id, company_id=company_id, is_deleted=False)

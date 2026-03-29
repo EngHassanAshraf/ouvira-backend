@@ -2,12 +2,16 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.generics import get_object_or_404
 
 from apps.hris.hris_core.selectors import LocationSelector, OrganizationSelector
 from apps.hris.hris_core.services import LocationService, OrganizationService, EmployeeService
 from apps.hris.hris_core.api.serializers import LocationSerializers, EmployeeListSerializer, EmployeeCreateSerializer
 from apps.hris.hris_core.selectors.employee_selectors import EmployeeSelector
-
+from apps.hris.hris_core.models.employee import Employee
+from apps.hris.hris_core.models.base import Location
+from apps.hris.hris_core.models.organization import Department
+from apps.hris.hris_core.api.serializers import DepartmentSerializer
 
 class LocationListCreateApiView(APIView):
     """
@@ -34,6 +38,92 @@ class LocationListCreateApiView(APIView):
             )
             return Response(LocationSerializers(location).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+#Location detail Api View
+class LocationDetailApiView(APIView):
+
+    """GET PATCH DELETE """
+    def get(self, request, pk):
+        location = get_object_or_404(
+            Location, pk=pk, company_id=request.tenant.id, is_deleted=False
+        )
+        return Response (LocationSerializers(location).data)
+
+    def patch(self, request, pk):
+        serializer = LocationSerializers(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            location = LocationService.update_location(
+                location_id=pk,
+                company_id=request.tenant.id,
+                **serializer.validated_data,
+            )
+            return Response(LocationSerializers(location).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, pk):
+        try:
+            LocationService.delete_location(location_id=pk, company_id=request.tenant.id)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+
+# Department List APi View
+class DepartmentListCreateApiView(APIView):
+    def get(self, request):
+        departments = OrganizationSelector.get_departments_by_company(
+            company_id=request.tenant.id
+        )
+        serializer = DepartmentSerializer(departments, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = DepartmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        department = OrganizationService.create_department(
+            company_id=request.tenant.id,
+            **serializer.validated_data
+        )
+        return Response(DepartmentSerializer(department).data,  status=status.HTTP_201_CREATED)
+
+
+
+#Department  Detail api view
+class DepartmentDetailApiView(APIView):
+    def get(self, request, pk):
+        department = get_object_or_404(
+            Department, pk=pk, company_id=request.tenant.id, is_deleted=False
+        )
+        return Response(DepartmentSerializer(department).data)
+
+    def patch(self, request, pk):
+        serializer = DepartmentSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            department = OrganizationService.update_department(
+                department_id=pk,
+                company_id=request.tenant.id
+                **serializer.validated_data
+            )
+            return Response(DepartmentSerializer(department).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, pk):
+        try:
+            OrganizationService.deleted_department(
+                department_id=pk, company_id=request.tenant.id
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+
 
 #______________________________________________________
 # Employee List Create Api View
@@ -63,3 +153,42 @@ class EmployeeListCreateApiView(APIView):
             EmployeeListSerializer(employee).data,
             status=status.HTTP_201_CREATED
         )
+
+
+#----------------------------------------------------
+# Employee DetailApi View
+#-------------------------
+
+class EmployeeDetailApiView(APIView):
+    """
+    Bitta xodimni ko'risho O'chirish tahrirlash va o'chirish
+    get or Delete, a single employee by ID
+    """
+    serializer_class = EmployeeCreateSerializer
+
+    def get(self, request, pk):
+        employee =  get_object_or_404(Employee,pk=pk, company_id=request.tenant.id)
+        serializer = EmployeeListSerializer(employee)
+        return Response(serializer.data)
+
+    def patch(self, request, pk):
+        serializer = EmployeeCreateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            #servise
+            updated_employee = EmployeeService.update_employee(
+                employee_id=pk,
+                company_id=request.tenant.id,
+                **serializer.validated_data
+            )
+            return Response(EmployeeListSerializer(updated_employee).data)
+        except ValueError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+
+    def delete(self, request, pk):
+        employee = get_object_or_404(Employee, pk=pk, company_id=request.tenant.id)
+        employee.delete() #soft delete ishlatamzi
+        return Response(status=status.HTTP_204_NO_CONTENT)
+

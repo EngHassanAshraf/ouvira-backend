@@ -8,7 +8,7 @@ class OrganizationSelector:
         UZB: Kompaniyaning barcha bo'limlarini iyerarxiya va menejerlari bilan olish.
         """
         return Department.objects.filter(
-            companiy_id=company_id
+            company_id=company_id
         ).select_related("parent_department", "manager")
 
     @staticmethod

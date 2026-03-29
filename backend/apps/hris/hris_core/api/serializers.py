@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from apps.hris.hris_core.models import Location
 from apps.hris.hris_core.models.employee import Employee
+from apps.hris.hris_core.models.organization import Department
 from django.utils.translation import gettext_lazy as _
 
 class LocationSerializers(serializers.ModelSerializer):
@@ -9,21 +10,39 @@ class LocationSerializers(serializers.ModelSerializer):
         fields = ['id', 'name', 'address', 'city', 'country', 'is_active']
 
 
+class DepartmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Department
+        fields = ["id", 'name']
+
+
 class EmployeeListSerializer(serializers.ModelSerializer):
     """
     UZB: Xodimlarni ro'yhattan o'tkazish faqat asosiy maydonlar
     ENG: for listing employee with basic information
     """
+    full_name = serializers.SerializerMethodField
+    department = DepartmentSerializer(read_only=True)
+    location_name = serializers.CharField(source='location.name', read_only=True)
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
 
     class Meta:
         model = Employee
         fields = [
-            'id', 'employee_id', 'full_name', 'first_name', 'last_name',
-            'location_name', 'national_id', 'contact_number'
+            'id',
+            'employee_id',
+            'full_name',
+            'first_name',
+            'last_name',
+            'department',
+            'location_name',
+            'national_id',
+            'contact_number'
         ]
 
-        def get_full_name(self, obj):
-            return f"{obj.first_name} {obj.last_name}"
+
 
 class EmployeeCreateSerializer(serializers.ModelSerializer):
     """
@@ -33,7 +52,11 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Employee
-        fields = '__all__'
+        fields = [
+            'employee_id', 'first_name', 'last_name', 'national_id',
+            'nationality', 'gender', 'marital_status', 'contact_number',
+            'personal_email', 'location', 'department'
+        ]
         extra_kwargs ={
             'company': {'required': False},
             'employee_id': {'required': True}
