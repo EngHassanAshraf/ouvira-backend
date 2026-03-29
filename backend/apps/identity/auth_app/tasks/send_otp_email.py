@@ -9,7 +9,7 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, max_retries=3)
+# @shared_task(bind=True, max_retries=3)
 def send_otp_email(self, email: str, raw_otp: str):
     """Send OTP to email address. Accepts only primitives."""
     try:

@@ -128,7 +128,8 @@ class OTPService:
         if channel == OTPRecord.Channel.EMAIL:
             try:
                 from apps.identity.auth_app.tasks.send_otp_email import send_otp_email
-                send_otp_email.delay(identifier, raw_otp)
+                # send_otp_email.delay(identifier, raw_otp)
+                send_otp_email(identifier, raw_otp)
                 logger.info("OTP sent | channel=%s | identifier=<redacted>", channel)
             except Exception:
                 logger.exception("Failed to enqueue OTP email | identifier=<redacted>")
