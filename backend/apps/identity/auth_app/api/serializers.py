@@ -54,7 +54,19 @@ class BaseUserInputSerializer(serializers.Serializer):
 
 class SignupSerializer(BaseUserInputSerializer):
     """Serializer for user signup"""
-    pass
+    cf_turnstile_response = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        help_text="Cloudflare Turnstile token"
+    )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        token = attrs.get("cf_turnstile_response")
+        if not verify_turnstile(request, token):
+            raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
+        return attrs
 
 
 class FinalizeSignInSerializer(serializers.Serializer):
@@ -149,6 +161,19 @@ class ResentOTPSerializer(serializers.Serializer):
         ],
         help_text="Phone number to resend OTP to"
     )
+    cf_turnstile_response = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        help_text="Cloudflare Turnstile token"
+    )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        token = attrs.get("cf_turnstile_response")
+        if not verify_turnstile(request, token):
+            raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
+        return attrs
 
 
 # ==================== LOGIN SERIALIZERS ====================
@@ -209,11 +234,10 @@ class LoginSerializer(serializers.Serializer):
         remember_me = attrs.get("remember_me", False)
         token = attrs.get("cf_turnstile_response", None)
 
-        # Verify Turnstile token (skip in test mode)
-        from django.conf import settings
-        if not getattr(settings, "TEST_MODE", False):
-            if not token or not verify_turnstile(token):
-                raise serializers.ValidationError("Invalid Turnstile token")
+        # Verify Turnstile token
+        request = self.context.get("request")
+        if not verify_turnstile(request, token):
+            raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
 
         from ..services.auth_service import AuthService
         
@@ -289,6 +313,19 @@ class SendOTPSerializer(serializers.Serializer):
         max_length=255,
         help_text="Email address or phone number. Channel (email/SMS) is auto-detected.",
     )
+    cf_turnstile_response = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        help_text="Cloudflare Turnstile token"
+    )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        token = attrs.get("cf_turnstile_response")
+        if not verify_turnstile(request, token):
+            raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
+        return attrs
 
 
 class VerifyOTPSerializer(serializers.Serializer):
@@ -307,6 +344,19 @@ class ForgotPasswordSerializer(serializers.Serializer):
         max_length=255,
         help_text="Email address or phone number.",
     )
+    cf_turnstile_response = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        help_text="Cloudflare Turnstile token"
+    )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        token = attrs.get("cf_turnstile_response")
+        if not verify_turnstile(request, token):
+            raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
+        return attrs
 
 
 class ValidateResetTokenSerializer(serializers.Serializer):
