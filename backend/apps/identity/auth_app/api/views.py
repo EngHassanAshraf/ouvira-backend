@@ -74,7 +74,7 @@ class SignUPView(APIView):
 
     @swagger_auto_schema(request_body=SignupSerializer)
     def post(self, request):
-        serializer = SignupSerializer(data=request.data)
+        serializer = SignupSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         phone_number = serializer.validated_data.get("primary_mobile")
@@ -132,18 +132,7 @@ class ResentOTPView(APIView):
 
     @swagger_auto_schema(request_body=ResentOTPSerializer, security=[])
     def post(self, request):
-        # Verify Turnstile token
-        token = request.data.get("cf-turnstile-response")
-        if not token or not verify_turnstile(token, request.META.get("REMOTE_ADDR")):
-            return Response(
-                {
-                    "status": "error",
-                    "message": ERROR_MESSAGES["SYSTEM_ERROR"]
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        serializer = ResentOTPSerializer(data=request.data)
+        serializer = ResentOTPSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
         phone_number = serializer.validated_data["primary_mobile"]
@@ -244,7 +233,7 @@ class LoginView(APIView):
 
     @swagger_auto_schema(request_body=LoginSerializer)
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        serializer = LoginSerializer(data=request.data, context={"request": request})
 
         if not serializer.is_valid():
             error_message = ERROR_MESSAGES["LOGIN_CREDENTIALS_INCORRECT"]
@@ -496,7 +485,7 @@ class SendOTPView(APIView):
 
     @swagger_auto_schema(request_body=SendOTPSerializer)
     def post(self, request):
-        serializer = SendOTPSerializer(data=request.data)
+        serializer = SendOTPSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         identifier = serializer.validated_data["identifier"]
 
@@ -564,7 +553,7 @@ class ForgotPasswordView(APIView):
 
     @swagger_auto_schema(request_body=ForgotPasswordSerializer)
     def post(self, request):
-        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer = ForgotPasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         identifier = serializer.validated_data["identifier"]
 
