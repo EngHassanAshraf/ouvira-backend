@@ -11,7 +11,15 @@ from apps.hris.hris_core.api.views import (
     LocationDetailApiView,
     DepartmentListCreateApiView,
     DepartmentDetailApiView,
+)
 
+from apps.hris.hris_core.api.views import (
+    LocationListCreateApiView,
+    LocationDetailApiView,
+    DepartmentListCreateApiView,
+    DepartmentDetailApiView,
+    JobTitleListCreateApiView,
+    JobTitleDetailApiView,
 )
 
 urlpatterns = [
@@ -23,4 +31,7 @@ urlpatterns = [
 
     path("departments/", DepartmentListCreateApiView.as_view(), name="department-list-create"),
     path("departments/<int:pk>/", DepartmentDetailApiView.as_view(), name="department-detail"),
+
+    path("job-titles/", JobTitleListCreateApiView.as_view(), name="jobtitle-list-create"),
+    path("job-titles/<int:pk>/", JobTitleDetailApiView.as_view(), name="jobtitle-detail"),
 ]

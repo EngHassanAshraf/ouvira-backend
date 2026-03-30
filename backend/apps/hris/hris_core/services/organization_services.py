@@ -51,3 +51,32 @@ class OrganizationService:
             company_id=company_id,
             description=description
         )
+
+    @staticmethod
+    @transaction.atomic
+    def update_job_title(job_title_id: int, company_id: int, **data)-> JobTitle:
+        job_title = JobTitle.objects.filter(
+            id=job_title_id, company_id=company_id, is_deleted=False
+        ).first()
+
+        if not job_title:
+            raise ValueError("Lob title not found")
+
+        for attr, value in data.items():
+            setattr(job_title, attr,value)
+
+        job_title.save()
+        return job_title
+
+
+    @staticmethod
+    @transaction.atomic
+    def delete_job_title(job_title_id: int, company_id: int)-> None:
+        job_title  = JobTitle.objects.flter(
+            id=job_title_id, company_id=company_id, is_deleted=False
+        ).first()
+
+        if not job_title:
+            raise ValueError("JobTitle not found")
+
+        job_title.delete()

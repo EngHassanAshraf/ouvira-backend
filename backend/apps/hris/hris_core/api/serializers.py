@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from apps.hris.hris_core.models import Location
 from apps.hris.hris_core.models.employee import Employee
-from apps.hris.hris_core.models.organization import Department
+from apps.hris.hris_core.models.organization import Department, JobTitle
 from django.utils.translation import gettext_lazy as _
 
 class LocationSerializers(serializers.ModelSerializer):
@@ -14,6 +14,14 @@ class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Department
         fields = ["id", 'name']
+
+
+
+class JobTitleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JobTitle
+        fields = ["id", "title", "description"]
+
 
 
 class EmployeeListSerializer(serializers.ModelSerializer):

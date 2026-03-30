@@ -10,8 +10,9 @@ from apps.hris.hris_core.api.serializers import LocationSerializers, EmployeeLis
 from apps.hris.hris_core.selectors.employee_selectors import EmployeeSelector
 from apps.hris.hris_core.models.employee import Employee
 from apps.hris.hris_core.models.base import Location
-from apps.hris.hris_core.models.organization import Department
-from apps.hris.hris_core.api.serializers import DepartmentSerializer
+from apps.hris.hris_core.models.organization import Department, JobTitle
+
+from apps.hris.hris_core.api.serializers import DepartmentSerializer,JobTitleSerializer
 
 class LocationListCreateApiView(APIView):
     """
@@ -124,6 +125,58 @@ class DepartmentDetailApiView(APIView):
             return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
 
 
+#Job title List create  Api view
+
+class JobTitleListCreateApiView(APIView):
+    def get(self, request):
+        job_title = OrganizationSelector.get_job_titles_by_company(
+            company_id=request.tenant.id
+        )
+        serializer = JobTitleSerializer(job_title, many=True)
+        return Response(serializer.data)
+
+    def post(self,  request):
+        serializer = JobTitleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job_title = OrganizationService.create_job_title(
+            company_id=request.tenant.id,
+            **serializer.validated_data,
+        )
+        return Response(JobTitleSerializer(job_title).data, status=status.HTTP_201_CREATED)
+
+
+
+
+class JobTitleDetailApiView(APIView):
+
+    def get(self, request, pk):
+        job_title = get_object_or_404(
+            JobTitle, pk=pk, company_id=request.tenant.id, is_deleted=False
+        )
+        return Response(JobTitleSerializer(job_title).data)
+
+    def patch(self, request, pk):
+        serializer = JobTitleSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            job_title = OrganizationService.update_job_title(
+                job_title_id=pk,
+                company_id=request.tenant.id,
+                **serializer.validated_data,
+            )
+            return Response(JobTitleSerializer(job_title).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, pk):
+        try:
+            OrganizationService.delete_job_title(
+                job_title_id=pk, company_id=request.tenant.id
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
 
 #______________________________________________________
 # Employee List Create Api View
@@ -186,9 +239,11 @@ class EmployeeDetailApiView(APIView):
         except ValueError as e:
             return Response({'detail': str(e)}, status=status.HTTP_404_NOT_FOUND)
 
-
     def delete(self, request, pk):
-        employee = get_object_or_404(Employee, pk=pk, company_id=request.tenant.id)
-        employee.delete() #soft delete ishlatamzi
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
+        try:
+            EmployeeService.delete_employee(
+                employee_id=pk, company_id=request.tenant.id
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
