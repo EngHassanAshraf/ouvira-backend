@@ -153,6 +153,10 @@ class AuthService:
             BusinessException: If email already exists
         """
         # Check if email is already taken
+        if user.email:
+            raise BusinessException("This user is already registered")
+
+        # Check if email is already taken
         if CustomUser.objects.filter(email=email).exclude(pk=user.pk).exists():
             raise BusinessException("Email is already registered")
         
