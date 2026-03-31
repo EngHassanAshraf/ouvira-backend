@@ -104,7 +104,7 @@ class OTPService:
 
         # AUTH-006: Wrap delete + create in a single atomic block so a failed create
         # cannot leave the user with no active OTP record.
-        print(f"{'='*10} raw otp", raw_otp)
+        print(f"Testing: {'='*10} raw otp", raw_otp)
         with transaction.atomic():
             # Purge any previous unverified record for this identifier
             OTPRecord.objects.filter(identifier=identifier, is_verified=False).delete()
@@ -127,10 +127,13 @@ class OTPService:
         """Dispatch OTP delivery. Deferred import to avoid circular import on startup."""
         if channel == OTPRecord.Channel.EMAIL:
             try:
-                from apps.identity.auth_app.tasks.send_otp_email import send_otp_email
-                send_otp_email.delay(identifier, raw_otp)
+                from apps.identity.auth_app.tasks import send_otp_email
+                print(f"Dispatching OTP email to {identifier}")
+                result = send_otp_email.delay(identifier, raw_otp)
+                print(f"Task dispatched: {result.id}")
                 logger.info("OTP sent | channel=%s | identifier=<redacted>", channel)
-            except Exception:
+            except Exception as e:
+                print(f"FAILED to enqueue: {e}")
                 logger.exception("Failed to enqueue OTP email | identifier=<redacted>")
         else:
             try:

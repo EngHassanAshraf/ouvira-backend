@@ -15,18 +15,27 @@ def verify_turnstile(request: HttpRequest, token: str = None) -> bool:
     """
     # 1. Environment-based bypass
     if getattr(settings, "DEBUG", False) or getattr(settings, "TEST_MODE", False):
+        logger.info("Bypassing Turnstile verification | DEBUG: %s | TEST_MODE: %s", getattr(settings, "DEBUG", False), getattr(settings, "TEST_MODE", False))
         return True
     
     # 2. Header-based bypass (for Postman/Automated testing)
     bypass_token = getattr(settings, "TURNSTILE_BYPASS_TOKEN", None)
     if bypass_token and request.headers.get("X-Turnstile-Bypass") == bypass_token:
+        logger.info("Bypassing Turnstile verification | bypass_token: <REDACTED> | request.headers.get(\"X-Turnstile-Bypass\"): %s", request.headers.get("X-Turnstile-Bypass"))
         return True
 
-    # 3. Extract token if not provided
+    # 3. Request-based bypass (for Postman/Automated testing)
+    if request.data.get("cf_turnstile_response") == settings.TURNSTILE_BYPASS_TOKEN:
+        logger.info("Bypassing Turnstile verification | cf_turnstile_response: %s", request.data.get("cf_turnstile_response"))
+        return True
+
+    # 4. Extract token if not provided
     if not token and request:
-        token = request.data.get("cf-turnstile-response")
+        logger.info("Extracting token from request | request.data: %s", request.data)
+        token = request.data.get("cf_turnstile_response")
 
     if not token:
+        logger.info("No token provided | token: %s", token)
         return False
     
     url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
@@ -34,16 +43,19 @@ def verify_turnstile(request: HttpRequest, token: str = None) -> bool:
         "secret": settings.TURNSTILE_SECRET_KEY,
         "response": token,
     }
-    
+
     # Optional: pass remote IP for validation
     from ipware import get_client_ip
     client_ip, _ = get_client_ip(request)
     if client_ip:
+        logger.info("Turnstile verification data: %s", data)
         data["remoteip"] = client_ip
 
     try:
         resp = requests.post(url, data=data, timeout=5)
+        logger.info("Turnstile verification response: %s", resp)
         result = resp.json()
+        logger.info("Turnstile verification result: %s", result)
         success = result.get("success", False)
         if not success:
             logger.warning(f"Turnstile verification failed: {result.get('error-codes')}")

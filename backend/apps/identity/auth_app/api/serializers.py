@@ -10,7 +10,6 @@ from rest_framework import serializers
 from apps.identity.account.models.user import CustomUser
 from ..utils import validate_user_email, validate_user_password, validate_user_mobile, verify_turnstile
 
-
 # ==================== BASE SERIALIZERS ====================
 
 class BaseUserInputSerializer(serializers.Serializer):
@@ -68,7 +67,6 @@ class SignupSerializer(BaseUserInputSerializer):
             raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
         return attrs
 
-
 class FinalizeSignInSerializer(serializers.Serializer):
     """Serializer for finalizing signup with email and password"""
     primary_mobile = serializers.CharField(
@@ -120,35 +118,6 @@ class FinalizeSignInSerializer(serializers.Serializer):
 
 
 # ==================== OTP SERIALIZERS ====================
-
-# class OTPVerifySerializer(serializers.Serializer):
-#     """Serializer for OTP verification"""
-#     primary_mobile = serializers.CharField(
-#         max_length=13, 
-#         allow_blank=False,
-#         help_text="Phone number associated with OTP"
-#     )
-#     otp_code = serializers.CharField(
-#         min_length=6,
-#         max_length=6,
-#         allow_blank=False,
-#         validators=[
-#             RegexValidator(
-#                 regex=r"^\d{6}$", 
-#                 message="OTP code must be exactly 6 digits"
-#             )
-#         ],
-#         help_text="6-digit OTP code"
-#     )
-
-#     def validate_primary_mobile(self, value):
-#         """Validate phone number format"""
-#         try:
-#             validate_user_mobile(value)
-#         except ValidationError as e:
-#             raise serializers.ValidationError(e.messages)
-#         return value
-
 
 class ResentOTPSerializer(serializers.Serializer):
     """Serializer for resending OTP"""

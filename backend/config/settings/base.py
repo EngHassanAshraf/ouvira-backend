@@ -21,7 +21,6 @@ TEST_MODE = os.getenv("TEST_MODE", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 
-
 # === APPLICATION DEFINITION ===
 
 DEFAULT_APPS = (

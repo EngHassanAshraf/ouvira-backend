@@ -124,6 +124,7 @@ class SignUPView(APIView):
 
 
 # ==================== OTP VIEWS ====================
+
 class ResentOTPView(APIView):
     """Resend OTP endpoint"""
     permission_classes = [AllowAny]
@@ -236,6 +237,14 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data, context={"request": request})
 
         if not serializer.is_valid():
+            if not serializer.data.get("cf_turnstile_response"):
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "Invalid Turnstile token"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             error_message = ERROR_MESSAGES["LOGIN_CREDENTIALS_INCORRECT"]
             non_field_errors = serializer.errors.get("non_field_errors")
             if non_field_errors:
@@ -491,9 +500,11 @@ class SendOTPView(APIView):
 
         try:
             OTPService.generate_and_send(identifier)
-        except BusinessException:
+        except BusinessException as e:
+            logger.error(f"OTP generation failed for {identifier} | error: {str(e)}")
             pass  # Suppress all errors — always return 200 (prevent enumeration + rate signal)
 
+        logger.info(f"OTP sent successfully for {identifier}")
         return Response(
             {"detail": "If this identifier is registered, an OTP has been sent."},
             status=status.HTTP_200_OK,
