@@ -302,6 +302,7 @@ CELERY_TIMEZONE = TIME_ZONE
 if TEST_MODE:
     CELERY_TASK_ALWAYS_EAGER = True
     CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TASK_DEFAULT_QUEUE = "default"
 
 # Nightly cleanup schedule — use crontab if celery is installed
 try:
