@@ -51,7 +51,14 @@ class PasswordChangeService:
         # Step 2: Policy check
         validate_user_password(new_password)
 
-        # Step 3: History reuse check
+        # Step 3: Email Verification Check
+        if not user.email_verified:
+            raise ValidationError({
+                "error": "email_not_verified",
+                "detail": "Email not verified.",
+            })
+
+        # Step 4: History reuse check
         if is_password_reused(user, new_password):
             raise ValidationError({
                 "error": "password_reused",
