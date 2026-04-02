@@ -31,7 +31,7 @@ class OrganizationService:
 
     @staticmethod
     @transaction.atomic
-    def deleted_department(department_id: int, company_id: int)-> None:
+    def delete_department(department_id: int, company_id: int)-> None:
         department = Department.objects.filter(
             id=department_id, company_id=company_id, is_deleted=False
         ).first()

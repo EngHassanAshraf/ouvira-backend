@@ -1,8 +1,10 @@
-from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
+
+from rest_framework.permissions import IsAuthenticated
+from apps.access_control.permissions.IsAdminUser import IsAdminUser
 
 from apps.hris.hris_core.selectors import LocationSelector, OrganizationSelector
 from apps.hris.hris_core.services import LocationService, OrganizationService, EmployeeService
@@ -19,12 +21,20 @@ class LocationListCreateApiView(APIView):
         UZB: Filiallar ro'yxatini olish va yangi filial yaratish uchun API.
         ENG: API to list all locations and create a new location.
     """
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+
+
     def get(self, request):
         company_id = request.query_params.get('company_id', 1)
 
-        locations = OrganizationSelector.get_locations_by_company(company_id=company_id)
+        locations = LocationSelector.get_locations_by_company(company_id=company_id)
         serializer = LocationSerializers(locations, many=True)
         return Response(serializer.data)
+
 
     def post(self, request):
         serializer = LocationSerializers(data=request.data)
@@ -45,6 +55,12 @@ class LocationListCreateApiView(APIView):
 class LocationDetailApiView(APIView):
 
     """GET PATCH DELETE """
+    def get_permissions(self):
+        if self.request.method =="GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+
     def get(self, request, pk):
         location = get_object_or_404(
             Location, pk=pk, company_id=request.tenant.id, is_deleted=False
@@ -76,6 +92,13 @@ class LocationDetailApiView(APIView):
 
 # Department List APi View
 class DepartmentListCreateApiView(APIView):
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+
     def get(self, request):
         departments = OrganizationSelector.get_departments_by_company(
             company_id=request.tenant.id
@@ -96,6 +119,14 @@ class DepartmentListCreateApiView(APIView):
 
 #Department  Detail api view
 class DepartmentDetailApiView(APIView):
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+
+
     def get(self, request, pk):
         department = get_object_or_404(
             Department, pk=pk, company_id=request.tenant.id, is_deleted=False
@@ -108,7 +139,7 @@ class DepartmentDetailApiView(APIView):
         try:
             department = OrganizationService.update_department(
                 department_id=pk,
-                company_id=request.tenant.id
+                company_id=request.tenant.id,
                 **serializer.validated_data
             )
             return Response(DepartmentSerializer(department).data)
@@ -117,7 +148,7 @@ class DepartmentDetailApiView(APIView):
 
     def delete(self, request, pk):
         try:
-            OrganizationService.deleted_department(
+            OrganizationService.delete_department(
                 department_id=pk, company_id=request.tenant.id
             )
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -128,6 +159,13 @@ class DepartmentDetailApiView(APIView):
 #Job title List create  Api view
 
 class JobTitleListCreateApiView(APIView):
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+
     def get(self, request):
         job_title = OrganizationSelector.get_job_titles_by_company(
             company_id=request.tenant.id
@@ -148,6 +186,13 @@ class JobTitleListCreateApiView(APIView):
 
 
 class JobTitleDetailApiView(APIView):
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+
 
     def get(self, request, pk):
         job_title = get_object_or_404(
@@ -183,7 +228,13 @@ class JobTitleDetailApiView(APIView):
 #_______________________________________________________
 
 class EmployeeListCreateApiView(APIView):
-    permission_classes = [AllowAny]  # FAQAT TEST UCHUN!
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+
     serializer_class = EmployeeCreateSerializer
     def get(self, request):
         company_id = request.tenant.id
@@ -217,6 +268,13 @@ class EmployeeDetailApiView(APIView):
     Bitta xodimni ko'risho O'chirish tahrirlash va o'chirish
     get or Delete, a single employee by ID
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+
     serializer_class = EmployeeCreateSerializer
 
     def get(self, request, pk):
