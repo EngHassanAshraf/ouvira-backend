@@ -1,3 +1,4 @@
+from django.db.migrations import serializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -7,14 +8,23 @@ from rest_framework.permissions import IsAuthenticated
 from apps.access_control.permissions.IsAdminUser import IsAdminUser
 
 from apps.hris.hris_core.selectors import LocationSelector, OrganizationSelector
-from apps.hris.hris_core.services import LocationService, OrganizationService, EmployeeService
-from apps.hris.hris_core.api.serializers import LocationSerializers, EmployeeListSerializer, EmployeeCreateSerializer
+from hris.hris_core.selectors.employment_selector import EmploymentSelector
 from apps.hris.hris_core.selectors.employee_selectors import EmployeeSelector
+
+from apps.hris.hris_core.api.serializers import LocationSerializers, EmployeeListSerializer, EmployeeCreateSerializer
+from apps.hris.hris_core.api.serializers import DepartmentSerializer,JobTitleSerializer
+from hris.hris_core.api.serializers import EmploymentSerializer
+
 from apps.hris.hris_core.models.employee import Employee
 from apps.hris.hris_core.models.base import Location
 from apps.hris.hris_core.models.organization import Department, JobTitle
+from apps.hris.hris_core.models.employment import Employment
 
-from apps.hris.hris_core.api.serializers import DepartmentSerializer,JobTitleSerializer
+from apps.hris.hris_core.services import EmploymentService, LocationService, OrganizationService, EmployeeService
+
+
+
+
 
 class LocationListCreateApiView(APIView):
     """
@@ -43,7 +53,7 @@ class LocationListCreateApiView(APIView):
             # UZB: Ma'lumot valid bo'lsa, Servis orqali bazaga saqlaymiz
             # ENG: If data is valid, save to database via Service
             """
-            location = OrganizationService.create_location(
+            location = LocationService.create_location(
                 **serializer.validated_data,
                 company_id=request.data.get('company_id', 1)
             )
@@ -86,7 +96,6 @@ class LocationDetailApiView(APIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
-
 
 
 
@@ -184,7 +193,6 @@ class JobTitleListCreateApiView(APIView):
 
 
 
-
 class JobTitleDetailApiView(APIView):
 
     def get_permissions(self):
@@ -223,10 +231,9 @@ class JobTitleDetailApiView(APIView):
             return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
 
 
-#______________________________________________________
+#__________________________________________
 # Employee List Create Api View
-#_______________________________________________________
-
+#___________________________________________
 class EmployeeListCreateApiView(APIView):
 
     def get_permissions(self):
@@ -259,10 +266,9 @@ class EmployeeListCreateApiView(APIView):
         )
 
 
-#----------------------------------------------------
+#----------------------------------------
 # Employee DetailApi View
-#-------------------------
-
+#----------------------------------------
 class EmployeeDetailApiView(APIView):
     """
     Bitta xodimni ko'risho O'chirish tahrirlash va o'chirish
@@ -305,3 +311,72 @@ class EmployeeDetailApiView(APIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+
+#------------------------------------------
+#  EmploymentListCreateApiView
+#------------------------------------------
+class EmploymentListCreateApiView(APIView):
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated, IsAdminUser()]
+
+    def get(self, request, employee_pk):
+        employments = EmploymentSelector.get_by_employee(
+            employee_id=employee_pk
+        )
+        serializer = EmploymentSerializer(employments, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, employee_pk):
+        serializer = EmploymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        employment = EmploymentService.create_employment(
+            employee_id=employee_pk,
+            **serializer.validated_data,
+        )
+        return Response(EmploymentSerializer(employment).data, status=status.HTTP_201_CREATED)
+
+
+
+#----------------------------------------------
+#EmploymentDetailApiView
+#-----------------------------------------------
+class EmploymentDetailApiView(APIView):
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+
+    def get(self, request, employee_pk, pk):
+        employment = get_object_or_404(
+            Employment, pk=pk, employee_id=employee_pk, is_deleted=False
+        )
+        return Response(EmploymentSerializer(employment).data)
+
+    def patch(self, request, employee_pk, pk):
+        serializer = EmploymentSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            employment = EmploymentService.update_employment(
+                employment_id=pk,
+                employee_id=employee_pk,
+                **serializer.validated_data,
+            )
+            return Response(EmploymentSerializer(employment).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, employee_pk, pk):
+        try:
+            EmploymentService.delete_employment(
+                employment_id=pk, employee_id=employee_pk
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+

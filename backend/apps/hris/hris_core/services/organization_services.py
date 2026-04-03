@@ -25,8 +25,8 @@ class OrganizationService:
         for attr, value, in data.items():
             setattr(department, attr,  value)
 
-            department.save()
-            return department
+        department.save()
+        return department
 
 
     @staticmethod
@@ -72,7 +72,7 @@ class OrganizationService:
     @staticmethod
     @transaction.atomic
     def delete_job_title(job_title_id: int, company_id: int)-> None:
-        job_title  = JobTitle.objects.flter(
+        job_title  = JobTitle.objects.filter(
             id=job_title_id, company_id=company_id, is_deleted=False
         ).first()
 

@@ -1,8 +1,14 @@
 from rest_framework import serializers
+from django.utils.translation import gettext_lazy as _
+
+
 from apps.hris.hris_core.models import Location
 from apps.hris.hris_core.models.employee import Employee
 from apps.hris.hris_core.models.organization import Department, JobTitle
-from django.utils.translation import gettext_lazy as _
+from apps.hris.hris_core.models.employment import Employment
+
+
+
 
 class LocationSerializers(serializers.ModelSerializer):
     class Meta:
@@ -88,3 +94,18 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
         # Joriy kompaniya ichida tekshirish View darajasida qilinadi,
         # lekin bu yerda umumiy formatni tekshirish mumkin.
         return value
+
+
+
+class EmploymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Employment
+        fields = [
+            "id",
+            "employee",
+            "hire_date",
+            "status",
+            "employment_type",
+            "contract_start_date",
+            "contract_end_date",
+        ]
