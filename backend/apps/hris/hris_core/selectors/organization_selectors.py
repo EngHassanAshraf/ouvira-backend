@@ -1,5 +1,7 @@
 from django.db.models import QuerySet
 from apps.hris.hris_core.models import Department, JobTitle
+from apps.hris.hris_core.models.organization import Position
+
 
 class OrganizationSelector:
     @staticmethod
@@ -17,3 +19,17 @@ class OrganizationSelector:
         UZB: Kompaniyaning barcha lavozimlarini olish.
         """
         return JobTitle.objects.filter(company_id=company_id)
+
+
+    @staticmethod
+    def get_positions_by_company(company_id: int) -> QuerySet:
+        return Position.objects.filter(
+            company_id=company_id, is_deleted=False, is_active=True
+        ).select_related("job_title", "department", "location").order_by("department__name")
+
+
+    @staticmethod
+    def get_position_detail(position_id: int, company_id: int, )-> Position:
+        return Position.objects.get(
+            id=position_id, company_id=company_id, is_deleted=False
+        )

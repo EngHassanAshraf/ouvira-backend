@@ -4,10 +4,9 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.hris.hris_core.models import Location
 from apps.hris.hris_core.models.employee import Employee
-from apps.hris.hris_core.models.organization import Department, JobTitle
+from apps.hris.hris_core.models.organization import Department, JobTitle, Position
 from apps.hris.hris_core.models.employment import Employment
-
-
+from apps.hris.hris_core.models.attendance import AttendanceRecord
 
 
 class LocationSerializers(serializers.ModelSerializer):
@@ -108,4 +107,30 @@ class EmploymentSerializer(serializers.ModelSerializer):
             "employment_type",
             "contract_start_date",
             "contract_end_date",
+        ]
+
+
+class PositionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Position
+        fields = [
+            "id",
+            "job_title",
+            "department",
+            "location",
+            "reports_to",
+            "is_active"
+        ]
+
+
+class AttendanceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AttendanceRecord
+        fields = [
+            "id",
+            "employee",
+            "date",
+            "check_in_time",
+            "check_out_time",
+            "status",
         ]

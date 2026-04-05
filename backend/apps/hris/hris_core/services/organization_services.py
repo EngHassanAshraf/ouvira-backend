@@ -1,5 +1,7 @@
 from django.db import transaction
 from apps.hris.hris_core.models import Department, JobTitle
+from apps.hris.hris_core.models.organization import Position
+
 
 class OrganizationService:
     @staticmethod
@@ -80,3 +82,74 @@ class OrganizationService:
             raise ValueError("JobTitle not found")
 
         job_title.delete()
+
+
+    @staticmethod
+    @transaction.atomic
+    def create_position(company_id: int, **data)-> Position:
+        position = Position.objects.create(
+            company_id=company_id, **data
+        )
+        return position
+
+
+    @staticmethod
+    @transaction.atomic
+    def update_position(position_id: int, company_id: int, **data)-> Position:
+        position =Position.objects.filter(
+            id=position_id, company_id=company_id, is_deleted=False
+        ).first()
+
+        if not position:
+            raise ValueError("Position not found.")
+
+        for attr , value in data.items():
+            setattr(position,attr, value)
+
+        position.save()
+        return position
+
+    @staticmethod
+    @transaction.atomic
+    def delete_position(position_id: int, company_id: int)-> None:
+        position = Position.objects.filter(
+            id=position_id, company_id=company_id, is_deleted=False
+        ).first()
+
+        if not position:
+            raise ValueError("Position not found")
+
+        position.delete()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

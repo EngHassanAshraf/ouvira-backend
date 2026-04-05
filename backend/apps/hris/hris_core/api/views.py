@@ -1,29 +1,32 @@
-from django.db.migrations import serializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
-
 from rest_framework.permissions import IsAuthenticated
 from apps.access_control.permissions.IsAdminUser import IsAdminUser
 
 from apps.hris.hris_core.selectors import LocationSelector, OrganizationSelector
-from hris.hris_core.selectors.employment_selector import EmploymentSelector
+from apps.hris.hris_core.selectors.employment_selector import EmploymentSelector
 from apps.hris.hris_core.selectors.employee_selectors import EmployeeSelector
+from apps.hris.hris_core.selectors.attendance_selectors import AttendanceSelector
 
-from apps.hris.hris_core.api.serializers import LocationSerializers, EmployeeListSerializer, EmployeeCreateSerializer
-from apps.hris.hris_core.api.serializers import DepartmentSerializer,JobTitleSerializer
-from hris.hris_core.api.serializers import EmploymentSerializer
+from apps.hris.hris_core.api.serializers import (
+    LocationSerializers, EmployeeListSerializer,
+    EmployeeCreateSerializer, EmploymentSerializer,
+    PositionSerializer, AttendanceSerializer,
+    DepartmentSerializer,JobTitleSerializer
+)
+
+
 
 from apps.hris.hris_core.models.employee import Employee
 from apps.hris.hris_core.models.base import Location
-from apps.hris.hris_core.models.organization import Department, JobTitle
+from apps.hris.hris_core.models.organization import Department, JobTitle, Position
 from apps.hris.hris_core.models.employment import Employment
+from apps.hris.hris_core.models.attendance import AttendanceRecord
 
 from apps.hris.hris_core.services import EmploymentService, LocationService, OrganizationService, EmployeeService
-
-
-
+from apps.hris.hris_core.services.attendance_services import AttendanceService
 
 
 class LocationListCreateApiView(APIView):
@@ -378,5 +381,157 @@ class EmploymentDetailApiView(APIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+class PositionListCreateApiView(APIView):
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+    def get(self, request):
+        position = OrganizationSelector.get_positions_by_company(
+            company_id=request.tenant.id
+        )
+        serializer = PositionSerializer(position, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = PositionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        position = OrganizationService.create_position(
+            company_id=request.tenant.id,
+            **serializer.validated_data
+        )
+        return Response(PositionSerializer(position).data, status=status.HTTP_201_CREATED)
+
+
+
+class PositionDetailApiView(APIView):
+
+    def get_permissions(self):
+        if self.request.method== "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+    def get(self, request, pk):
+        position = get_object_or_404(
+            Position, pk=pk, company_id=request.tenant.id, is_deleted=False
+        )
+        return Response(PositionSerializer(position).data)
+
+    def patch(self, request, pk):
+        serializer = PositionSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            position = OrganizationService.update_position(
+                position_id=pk,
+                company_id=request.tenant.id,
+                **serializer.validated_data,
+            )
+            return Response(PositionSerializer(position).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, pk):
+        try:
+            OrganizationService.delete_position(
+                position_id=pk, company_id=request.tenant.id
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+class AttendanceListCreateApiView(APIView):
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+
+    def get(self, request, employee_pk):
+        attendences = AttendanceSelector.get_by_employee(
+            employee_id=employee_pk
+        )
+        serializer =AttendanceSerializer(attendences, many=True)
+        return Response(serializer.data)
+
+
+    def post(self, request, employee_pk):
+        serializer = AttendanceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        attendance = AttendanceService.check_in(
+            employee_id=employee_pk,
+            date=serializer.validated_data["date"],
+            check_in_time=serializer.validated_data["check_in_time"]
+        )
+        return Response(AttendanceSerializer(attendance).data, status=status.HTTP_201_CREATED)
+
+
+
+class AttendanceDetailApiView(APIView):
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminUser()]
+
+    def get(self, request, employee_pk, pk):
+        attendence = get_object_or_404(
+            AttendanceRecord, pk=pk, employee_id=employee_pk, is_deleted=False
+        )
+        return Response(AttendanceSerializer(attendence).data)
+
+
+    def patch(self, request, employee_pk, pk):
+        serializer = AttendanceSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            attendance = AttendanceService.update_attendance(
+                attendance_id=pk,
+                employee_id=employee_pk,
+                **serializer.validated_data
+            )
+            return Response(AttendanceSerializer(attendance).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+
+    def delete(self, request, employee_pk, pk):
+        try:
+            AttendanceService.delete_attendance(
+                attendance_id=pk, employee_id=employee_pk
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

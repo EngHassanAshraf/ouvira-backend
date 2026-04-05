@@ -1,31 +1,13 @@
 from django.urls import path
 from apps.hris.hris_core.api.views import (
-    LocationListCreateApiView,
-    EmployeeListCreateApiView,
-    EmployeeDetailApiView,
-    LocationListCreateApiView,
-    LocationDetailApiView,
-)
-from apps.hris.hris_core.api.views import (
-    LocationListCreateApiView,
-    LocationDetailApiView,
-    DepartmentListCreateApiView,
-    DepartmentDetailApiView,
+    EmployeeListCreateApiView, EmployeeDetailApiView, PositionListCreateApiView,
+    PositionDetailApiView, AttendanceListCreateApiView, AttendanceDetailApiView,
+    JobTitleListCreateApiView, JobTitleDetailApiView, LocationListCreateApiView,
+    LocationDetailApiView, DepartmentListCreateApiView, DepartmentDetailApiView,
+    EmploymentListCreateApiView, EmploymentDetailApiView,
+
 )
 
-from apps.hris.hris_core.api.views import (
-    LocationListCreateApiView,
-    LocationDetailApiView,
-    DepartmentListCreateApiView,
-    DepartmentDetailApiView,
-    JobTitleListCreateApiView,
-    JobTitleDetailApiView,
-)
-
-from apps.hris.hris_core.api.views import (
-    EmploymentListCreateApiView,
-    EmploymentDetailApiView,
-)
 
 urlpatterns = [
     path('locations/', LocationListCreateApiView.as_view(), name='location-list-create'),
@@ -42,4 +24,10 @@ urlpatterns = [
 
     path("employees/<int:employee_pk>/employments/", EmploymentListCreateApiView.as_view(), name="employment-list-create"),
     path("employees/<int:employee_pk>/employments/<int:pk>/", EmploymentDetailApiView.as_view(), name="employment-detail"),
+
+    path("positions/", PositionListCreateApiView.as_view(), name="position-list-create"),
+    path("positions/<int:pk>/", PositionDetailApiView.as_view(), name="position-detail"),
+
+    path("employees/<int:employee_pk>/attendances/", AttendanceListCreateApiView.as_view(), name="attendance-list-create"),
+    path("employees/<int:employee_pk>/attendances/<int:pk>/", AttendanceDetailApiView.as_view(), name="attendance-detail"),
 ]
