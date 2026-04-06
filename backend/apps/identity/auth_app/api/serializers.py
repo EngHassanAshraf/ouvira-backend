@@ -10,7 +10,6 @@ from rest_framework import serializers
 from apps.identity.account.models.user import CustomUser
 from ..utils import validate_user_email, validate_user_password, validate_user_mobile, verify_turnstile
 
-
 # ==================== BASE SERIALIZERS ====================
 
 class BaseUserInputSerializer(serializers.Serializer):
@@ -54,8 +53,19 @@ class BaseUserInputSerializer(serializers.Serializer):
 
 class SignupSerializer(BaseUserInputSerializer):
     """Serializer for user signup"""
-    pass
+    cf_turnstile_response = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        help_text="Cloudflare Turnstile token"
+    )
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+        token = attrs.get("cf_turnstile_response")
+        if not verify_turnstile(request, token):
+            raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
+        return attrs
 
 class FinalizeSignInSerializer(serializers.Serializer):
     """Serializer for finalizing signup with email and password"""
@@ -109,35 +119,6 @@ class FinalizeSignInSerializer(serializers.Serializer):
 
 # ==================== OTP SERIALIZERS ====================
 
-class OTPVerifySerializer(serializers.Serializer):
-    """Serializer for OTP verification"""
-    primary_mobile = serializers.CharField(
-        max_length=13, 
-        allow_blank=False,
-        help_text="Phone number associated with OTP"
-    )
-    otp_code = serializers.CharField(
-        min_length=6,
-        max_length=6,
-        allow_blank=False,
-        validators=[
-            RegexValidator(
-                regex=r"^\d{6}$", 
-                message="OTP code must be exactly 6 digits"
-            )
-        ],
-        help_text="6-digit OTP code"
-    )
-
-    def validate_primary_mobile(self, value):
-        """Validate phone number format"""
-        try:
-            validate_user_mobile(value)
-        except ValidationError as e:
-            raise serializers.ValidationError(e.messages)
-        return value
-
-
 class ResentOTPSerializer(serializers.Serializer):
     """Serializer for resending OTP"""
     primary_mobile = serializers.CharField(
@@ -149,6 +130,19 @@ class ResentOTPSerializer(serializers.Serializer):
         ],
         help_text="Phone number to resend OTP to"
     )
+    cf_turnstile_response = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        help_text="Cloudflare Turnstile token"
+    )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        token = attrs.get("cf_turnstile_response")
+        if not verify_turnstile(request, token):
+            raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
+        return attrs
 
 
 # ==================== LOGIN SERIALIZERS ====================
@@ -209,23 +203,21 @@ class LoginSerializer(serializers.Serializer):
         remember_me = attrs.get("remember_me", False)
         token = attrs.get("cf_turnstile_response", None)
 
-        # Verify Turnstile token (skip in test mode)
-        from django.conf import settings
-        if not getattr(settings, "TEST_MODE", False):
-            if not token or not verify_turnstile(token):
-                raise serializers.ValidationError("Invalid Turnstile token")
+        # Verify Turnstile token
+        request = self.context.get("request")
+        if not verify_turnstile(request, token):
+            raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
 
-        # Get user by identifier
         from ..services.auth_service import AuthService
-        user = AuthService.get_user_by_identifier(identifier)
+        
+        # Delegate to AuthService for secure authentication (handles lockout, failed counts, resets)
+        user = AuthService.authenticate_user(identifier, password)
         
         if not user:
-            raise serializers.ValidationError(
-                "Username/Phone/Email/Password is incorrect"
-            )
-        
-        # Verify password
-        if not user.check_password(password):
+            # Check if reason is lockout to return accurate error, otherwise generic
+            raw_user = AuthService.get_user_by_identifier(identifier)
+            if raw_user and raw_user.is_locked():
+                raise serializers.ValidationError("Account is locked due to too many failed attempts. Try again later.")
             raise serializers.ValidationError(
                 "Username/Phone/Email/Password is incorrect"
             )
@@ -282,3 +274,74 @@ class TwoFABackupVerifySerializer(serializers.Serializer):
         max_length=100,
         help_text="Backup code for 2FA"
     )
+
+
+class SendOTPSerializer(serializers.Serializer):
+    """POST /api/auth/otp/send/ — channel auto-detected from identifier format."""
+    identifier = serializers.CharField(
+        max_length=255,
+        help_text="Email address or phone number. Channel (email/SMS) is auto-detected.",
+    )
+    cf_turnstile_response = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        help_text="Cloudflare Turnstile token"
+    )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        token = attrs.get("cf_turnstile_response")
+        if not verify_turnstile(request, token):
+            raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
+        return attrs
+
+
+class VerifyOTPSerializer(serializers.Serializer):
+    """POST /api/auth/otp/verify/"""
+    identifier = serializers.CharField(max_length=255)
+    otp = serializers.CharField(
+        min_length=6,
+        max_length=6,
+        validators=[RegexValidator(r"^\d{6}$", "OTP must be exactly 6 digits")],
+    )
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    """POST /api/auth/password/forgot/"""
+    identifier = serializers.CharField(
+        max_length=255,
+        help_text="Email address or phone number.",
+    )
+    cf_turnstile_response = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        help_text="Cloudflare Turnstile token"
+    )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        token = attrs.get("cf_turnstile_response")
+        if not verify_turnstile(request, token):
+            raise serializers.ValidationError({"cf_turnstile_response": "Invalid Turnstile token"})
+        return attrs
+
+
+class ValidateResetTokenSerializer(serializers.Serializer):
+    """GET /api/auth/password/validate-reset-token/?token=..."""
+    token = serializers.CharField(min_length=64, max_length=64)
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    """POST /api/auth/password/reset/"""
+    token = serializers.CharField(min_length=64, max_length=64)
+    new_password = serializers.CharField(min_length=8, max_length=40, write_only=True)
+    confirm_password = serializers.CharField(min_length=8, max_length=40, write_only=True)
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """POST /api/auth/password/change/"""
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(min_length=8, max_length=40, write_only=True)
+    confirm_password = serializers.CharField(min_length=8, max_length=40, write_only=True)

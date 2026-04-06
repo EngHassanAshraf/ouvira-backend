@@ -29,8 +29,9 @@ class TokenService:
         refresh = RefreshToken.for_user(user)
         
         if remember_me:
-            # Extend access token lifetime for remember me
-            refresh.access_token.set_exp(lifetime=timedelta(days=14))
+            # Extend access token lifetime for remember me — max 7 days (AUTH-003)
+            refresh.access_token.set_exp(lifetime=timedelta(days=7))
+            logger.warning("Long-lived token issued (remember_me) | user_id=%s", user.pk)
         
         return {
             "access": str(refresh.access_token),

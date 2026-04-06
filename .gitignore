@@ -1,13 +1,13 @@
-__pycache__/
 *.pyc
 db.sqlite3
 .env
+__pycache__/
 venv/
-
 staticfiles/
 entrprise_service/
 
-README1.md
-
 .vscode/
+.idea/
+# Docker
+backend/tmp_test_timezone.py
 geoip

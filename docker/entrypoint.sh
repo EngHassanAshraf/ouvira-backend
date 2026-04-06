@@ -1,8 +1,9 @@
 #!/bin/sh
+set -e
 
-echo "Running Migrations..."
-python manage.py migrate
+if [ "$RUN_MIGRATIONS" = "true" ]; then
+    echo "Running Migrations..."
+    python manage.py migrate --noinput
+fi
 
-echo "Starting Server..."
-python manage.py runserver 0.0.0.0:8000
 exec "$@"

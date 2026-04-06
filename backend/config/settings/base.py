@@ -21,7 +21,6 @@ TEST_MODE = os.getenv("TEST_MODE", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 
-
 # === APPLICATION DEFINITION ===
 
 DEFAULT_APPS = (
@@ -46,6 +45,7 @@ SHARED_APPS = [
     "apps.company",
     "apps.audit",
     "apps.access_control",
+    "django_celery_beat",
     ]
 
 TENANT_CREATED_APPS = (
@@ -106,16 +106,25 @@ REST_FRAMEWORK = {
         "finalize_signin": "3/h",
         "login": "5/m",
         "otp_resend": "3/h",
+        # 5/m matches the Redis attempt-lock threshold in OTPService.verify().
+        # The Redis lock is the primary enforcement (keyed to identifier, not IP).
+        # This DRF scope is a secondary IP-level backstop only.
         "otp_verify": "5/m",
         "twofa_verify": "5/m",
         "refresh": "20/m",
         "enable_2fa": "10/h",
         "register_owner": "3/h",
+        # New scopes (auth security endpoints)
+        "otp_send": "1/m",
+        "forgot_password": "3/h",
+        "password_change": "10/h",
     },
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY"),  # prefer a separate key
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),   # AUTH-001: ≤15min per OWASP ASVS 3.5.1
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
@@ -263,17 +272,55 @@ TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
 VONAGE_KEY = os.getenv("VONAGE_KEY")
 VONAGE_API_SECRET = os.getenv("VONAGE_API_SECRET")
 
+INFOBIP_API_KEY = os.getenv("INFOBIP_API_KEY")
+
 
 # === EMAIL SERVICE CONF ===
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587)) 
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "")
+ANYMAIL = {
+    "RESEND_API_KEY": os.getenv("RESEND_API_KEY", "")
+}
+# EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+# EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587)) 
+# EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+# EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+# EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
 
 # === TURNSTILE ===
 TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY")
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
+TURNSTILE_BYPASS_TOKEN = os.getenv("TURNSTILE_BYPASS_TOKEN", "")
+
+
+# === CELERY (JSON serializer prevents pickle deserialization attacks) ===
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TIMEZONE = TIME_ZONE
+
+if TEST_MODE:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TASK_DEFAULT_QUEUE = "default"
+
+# Nightly cleanup schedule — use crontab if celery is installed
+try:
+    from celery.schedules import crontab as _crontab
+    _cleanup_schedule = _crontab(hour=3, minute=0)
+except ImportError:
+    _cleanup_schedule = 86400  # fallback: 24 hours in seconds (celery not yet installed)
+
+CELERY_BEAT_SCHEDULE = {
+    "cleanup-expired-auth-records": {
+        "task": "apps.identity.auth_app.tasks.cleanup_tasks.cleanup_expired_auth_records",
+        "schedule": _cleanup_schedule,
+    },
+}
+
+
+# === GEOIP (MaxMind GeoLite2 offline DB path) ===
+GEOIP_PATH = os.path.join(BASE_DIR, "geoip", "GeoLite2-City.mmdb")

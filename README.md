@@ -135,7 +135,6 @@ All authenticated endpoints require `Authorization: Bearer <token>` and `X-Tenan
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | POST | `/api/auth/signup/` | None | Start signup (sends OTP) |
-| POST | `/api/auth/verify-otp/` | None | Verify OTP code |
 | POST | `/api/auth/resent-otp/` | None | Resend OTP |
 | POST | `/api/auth/finalize-signin/` | None | Complete signup (email + password) |
 | POST | `/api/auth/login/` | None | Login (email or phone) |
@@ -144,6 +143,12 @@ All authenticated endpoints require `Authorization: Bearer <token>` and `X-Tenan
 | POST | `/api/auth/settings_enable-2fa/` | Bearer | Enable 2FA (TOTP) |
 | POST | `/api/auth/login-2fa-verify-code/` | None | Verify 2FA code |
 | POST | `/api/auth/login-2fa-verify-backup/` | None | Verify 2FA backup code |
+| POST | `/api/auth/otp/send/` | None | Send OTP (email/SMS) |
+| POST | `/api/auth/otp/verify/` | None | Verify OTP |
+| POST | `/api/auth/password/forgot/` | None | Send password reset link |
+| GET | `/api/auth/password/validate-reset-token/` | None | Validate reset token |
+| POST | `/api/auth/password/reset/` | None | Reset password with token |
+| POST | `/api/auth/password/change/` | Bearer | Change password (known password) |
 
 ### Access Control — `api/access-control/`
 
@@ -180,7 +185,7 @@ All authenticated endpoints require `Authorization: Bearer <token>` and `X-Tenan
 |--------|----------|------|
 | GET, PUT, PATCH | `/api/account/profile/` | Bearer |
 | GET | `/api/account/users/` | Admin |
-| GET | `/api/account/session-tests/` | Bearer |
+| GET | `/api/account/session-tests/` | Bearer / Admin |
 
 ### Audit — `api/audit/`
 
@@ -199,8 +204,11 @@ All authenticated endpoints require `Authorization: Bearer <token>` and `X-Tenan
 | Anonymous | 200/day |
 | Authenticated | 1000/day |
 | Login | 5/min |
-| OTP/2FA | 3–5/hour |
+| OTP Verify & 2FA | 5/min |
+| OTP Send | 1/min |
 | Token Refresh | 20/min |
+| Password Forgot | 3/hour |
+| Password Change | 10/hour |
 
 ## Settings Modes
 

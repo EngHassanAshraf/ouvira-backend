@@ -13,4 +13,6 @@ SUCCESS_MESSAGES = {
     "PASSWORD_STRENGTH_CONFIRMED": "Your password is strong and secure.",
     "LOGGED_OUT": "You have logged out successfully.",
     "LOGIN_SUCCESS": "Login successful.",
+    "OTP_SENT": "OTP sent successfully.",
+    "OTP_VERIFIED": "OTP verified successfully.",
 }

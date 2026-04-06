@@ -17,13 +17,13 @@ class Employee(TimeStampedModel, SoftDeleteModel):
         WIDOWED = "W", _("Widowed")
 
     # Hassan yozgan bazaviy ulanishlar
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        related_name="employee_profile",
+    user_id = models.IntegerField(
         blank=True,
         null=True,
+        verbose_name=_("User ID"),
+        help_text=_("Reference to the shared user account")
     )
+
     company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="employees")
     department = models.ForeignKey(
         'hris_core.Department',  # Ilova nomi va Model nomi
@@ -76,3 +76,18 @@ class Employee(TimeStampedModel, SoftDeleteModel):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.employee_id})"
+    
+    @property
+    def user(self):
+        if self.user_id is None:
+            return None
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        try:
+            return User.objects.get(pk=self.user_id)
+        except User.DoesNotExist:
+            return None
+
+    @user.setter
+    def user(self, user_obj):
+        self.user_id = user_obj.pk if user_obj else None

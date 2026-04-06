@@ -333,13 +333,13 @@ Allows a user to request a new OTP code if the previous one has expired or was n
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `primary_mobile` | string | ✔ | User mobile number |
-| `cf-turnstile-response` | string | ✔ | Cloudflare human verification token |
+| `cf_turnstile_response` | string | ✔ | Cloudflare human verification token |
 
 **Example Request**
 ```json
 {
   "primary_mobile": "+998901234567",
-  "cf-turnstile-response": "token_xxx"
+  "cf_turnstile_response": "token_xxx"
 }
 ```
 

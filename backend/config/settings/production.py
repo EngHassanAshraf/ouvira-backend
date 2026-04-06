@@ -5,8 +5,6 @@ import sys
 from .base import *
 from corsheaders.defaults import default_headers
 
-DEBUG = False
-
 # Validate SECRET_KEY is not the Django insecure default
 if SECRET_KEY and "django-insecure" in SECRET_KEY:
     print(
@@ -28,6 +26,7 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_HEADERS = [
     *default_headers,
     "x-tenant",
+    "x-turnstile-bypass",
 ]
 
 # CSRF — trust your frontend domains

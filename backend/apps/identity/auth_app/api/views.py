@@ -2,28 +2,39 @@
 Optimized authentication views using service layer
 """
 import logging
+from ipware import get_client_ip
 
 from django.conf import settings
 from django.db import IntegrityError, DatabaseError
+from django.utils.timezone import now as utcnow
 
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.exceptions import ValidationError
+
+from ..utils import verify_turnstile
 
 from drf_yasg.utils import swagger_auto_schema
+
 
 from .serializers import (
     Enable2FASerializer,
     SignupSerializer,
     RefreshTokenSerializer,
-    OTPVerifySerializer,
     ResentOTPSerializer,
     LoginSerializer,
     TwoFACodeVerifySerializer,
     TwoFABackupVerifySerializer,
     FinalizeSignInSerializer,
+    SendOTPSerializer,
+    VerifyOTPSerializer,
+    ForgotPasswordSerializer,
+    ValidateResetTokenSerializer,
+    ResetPasswordSerializer,
+    ChangePasswordSerializer,
 )
 
 from ..services import (
@@ -32,6 +43,8 @@ from ..services import (
     TwoFAService,
     TokenService,
     LoginActivityService,
+    PasswordResetService,
+    PasswordChangeService,
 )
 
 from apps.identity.account.services import UserService
@@ -41,6 +54,14 @@ from apps.shared.messages.success import SUCCESS_MESSAGES
 from apps.shared.services.sms_service import send_sms
 
 logger = logging.getLogger(__name__)
+
+def _extract_ip(request) -> str:
+    ip, is_routable = get_client_ip(request)
+    return ip if ip is not None else "unknown"
+
+
+def _extract_ua(request) -> str:
+    return request.META.get("HTTP_USER_AGENT", "")
 
 
 # ==================== SIGNUP VIEWS ====================
@@ -53,26 +74,22 @@ class SignUPView(APIView):
 
     @swagger_auto_schema(request_body=SignupSerializer)
     def post(self, request):
-        serializer = SignupSerializer(data=request.data)
+        serializer = SignupSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         phone_number = serializer.validated_data.get("primary_mobile")
         full_name = serializer.validated_data.get("full_name")
 
-
         try:
             # Create or get user
             user, created = AuthService.signup_user(phone_number, full_name)
-            
+
             # Generate and send OTP
-            otp = OTPService.create_otp(phone_number)
-            
-            # Send SMS
-            send_sms(message=f"Your OTP code is {otp.otp_code}", phone=phone_number)
+            OTPService.generate_and_send(phone_number)
             return Response(
                 {
                     "status": "success",
-                    "message": SUCCESS_MESSAGES["PHONE_OTP_SENT"]
+                    "message": SUCCESS_MESSAGES["OTP_SENT"]
                 },
                 status=status.HTTP_200_OK,
             )
@@ -108,76 +125,6 @@ class SignUPView(APIView):
 
 # ==================== OTP VIEWS ====================
 
-class OTPVerifyView(APIView):
-    """OTP verification endpoint"""
-    permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "otp_verify"
-
-    @swagger_auto_schema(request_body=OTPVerifySerializer)
-    def post(self, request):
-        serializer = OTPVerifySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        phone_number = serializer.validated_data.get("primary_mobile")
-        otp_code = serializer.validated_data.get("otp_code")
-
-        try:
-            # Verify OTP
-            is_valid, error_message = OTPService.verify_otp(phone_number, otp_code)
-            
-            if not is_valid:
-                return Response(
-                    {
-                        "status": "error",
-                        "message": error_message
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Verify phone number
-            user = AuthService.verify_phone_number(phone_number)
-            
-            # Delete OTP after successful verification
-            OTPService.delete_otp(phone_number)
-
-            return Response(
-                {
-                    "status": "success",
-                    "message": SUCCESS_MESSAGES["MOBILE_VALIDATED"]
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        except BusinessException as e:
-            logger.warning(f"Business error during OTP verification: {e.message}")
-            return Response(
-                {
-                    "status": "error",
-                    "message": e.message
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        except DatabaseError as e:
-            logger.exception("Database error during OTP verification")
-            return Response(
-                {
-                    "status": "error",
-                    "message": ERROR_MESSAGES["SYSTEM_ERROR"]
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        except Exception as e:
-            logger.exception("Unexpected error during OTP verification")
-            return Response(
-                {
-                    "status": "error",
-                    "message": ERROR_MESSAGES["SYSTEM_ERROR"]
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-
 class ResentOTPView(APIView):
     """Resend OTP endpoint"""
     permission_classes = [AllowAny]
@@ -186,43 +133,20 @@ class ResentOTPView(APIView):
 
     @swagger_auto_schema(request_body=ResentOTPSerializer, security=[])
     def post(self, request):
-        from ..utils import verify_turnstile
-        
-        # Verify Turnstile token
-        token = request.data.get("cf-turnstile-response")
-        if not token or not verify_turnstile(token, request.META.get("REMOTE_ADDR")):
-            return Response(
-                {
-                    "status": "error",
-                    "message": ERROR_MESSAGES["SYSTEM_ERROR"]
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        serializer = ResentOTPSerializer(data=request.data)
+        serializer = ResentOTPSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
 
         phone_number = serializer.validated_data["primary_mobile"]
 
-        # Check if user exists
-        from apps.identity.account.models.user import CustomUser
-        if not CustomUser.objects.filter(primary_mobile=phone_number).exists():
-            return Response(
-                {
-                    "status": "error",
-                    "message": ERROR_MESSAGES["ACCOUNT_NOT_FOUND"]
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        # Generate new OTP
-        OTPService.create_otp(phone_number)
+        # AUTH-007: Do NOT reveal whether the phone number is registered.
+        # Always generate+send silently; if user doesn't exist OTPService will noop.
+        if AuthService.get_user_by_identifier(phone_number):
+            OTPService.generate_and_send(phone_number)
 
         return Response(
             {
                 "status": "success",
-                "message": SUCCESS_MESSAGES["PHONE_OTP_SENT"],
-                "expiry": "60 minutes",
+                "message": "If this number is registered, an OTP has been sent.",
             },
             status=status.HTTP_200_OK,
         )
@@ -247,10 +171,9 @@ class FinalizeSignInView(APIView):
 
         try:
             # Get user
-            from apps.identity.account.models.user import CustomUser
-            user = CustomUser.objects.filter(primary_mobile=primary_mobile).first()
+            user = AuthService.get_user_by_identifier(primary_mobile)
             
-            if not user:
+            if not user or not user.is_active or not user.phone_verified:
                 return Response(
                     {
                         "status": "error",
@@ -261,15 +184,12 @@ class FinalizeSignInView(APIView):
 
             # Finalize signup
             AuthService.finalize_signup(user, email, password)
-            
-            # Update user via UserService
-            user = UserService.update_existing_user(**serializer.validated_data)
 
             logger.info(f"User {primary_mobile} successfully finalized signup")
             
             return Response(
                 {
-                    "status": "success",
+                    "status": "success", 
                     "message": SUCCESS_MESSAGES["ASSIGNED_AS_OWNER"]
                 },
                 status=status.HTTP_200_OK,
@@ -314,24 +234,24 @@ class LoginView(APIView):
 
     @swagger_auto_schema(request_body=LoginSerializer)
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        serializer = LoginSerializer(data=request.data, context={"request": request})
 
         if not serializer.is_valid():
-            # Handle failed login attempts
-            identifier = request.data.get("identifier")
-            if identifier:
-                user = AuthService.get_user_by_identifier(identifier)
-                if user:
-                    user.failed_login_attempts += 1
-                    if user.failed_login_attempts >= 5:
-                        user.lock_account(minutes=30)
-                    else:
-                        user.save(update_fields=["failed_login_attempts"])
-
+            if not serializer.data.get("cf_turnstile_response"):
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "Invalid Turnstile token"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            error_message = ERROR_MESSAGES["LOGIN_CREDENTIALS_INCORRECT"]
+            non_field_errors = serializer.errors.get("non_field_errors")
+            if non_field_errors:
+                error_message = non_field_errors[0]
+                
             return Response(
-                {
-                    "message": ERROR_MESSAGES["LOGIN_CREDENTIALS_INCORRECT"]
-                },
+                {"status": "error", "message": str(error_message)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -342,10 +262,7 @@ class LoginView(APIView):
         if user.is_2fa_enabled:
             # Create 2FA session
             session = TwoFAService.create_login_session(user)
-            
-            # Generate 2FA code (for dev/testing)
-            generated_code = TwoFAService.generate_2fa_code(user)
-            
+
             # Record login activity
             LoginActivityService.record_login(user, request)
 
@@ -356,7 +273,7 @@ class LoginView(APIView):
                     ),
                     "2fa_required": True,
                     "session_id": str(session.session_id),
-                    "generated_code": generated_code,  # Remove in production
+                    # AUTH-004: generated_code REMOVED — exposing this allows 2FA bypass
                 },
                 status=status.HTTP_200_OK,
             )
@@ -566,3 +483,227 @@ class TwoFAVerifyBackupView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+# ==================== OTP VIEWS ====================
+
+class SendOTPView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "otp_send"
+
+    @swagger_auto_schema(request_body=SendOTPSerializer)
+    def post(self, request):
+        serializer = SendOTPSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        identifier = serializer.validated_data["identifier"]
+
+        try:
+            OTPService.generate_and_send(identifier)
+        except BusinessException as e:
+            logger.error(f"OTP generation failed for {identifier} | error: {str(e)}")
+            pass  # Suppress all errors — always return 200 (prevent enumeration + rate signal)
+
+        logger.info(f"OTP sent successfully for {identifier}")
+        return Response(
+            {"detail": "If this identifier is registered, an OTP has been sent."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class VerifyOTPView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "otp_verify"
+
+    @swagger_auto_schema(request_body=VerifyOTPSerializer)
+    def post(self, request):
+        serializer = VerifyOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        identifier = serializer.validated_data["identifier"]
+        otp_code = serializer.validated_data["otp"]
+
+        try:
+            AuthService.verify_user_otp(identifier, otp_code)
+            
+            return Response(
+                {"status": "success", "message": SUCCESS_MESSAGES["OTP_VERIFIED"]},
+                status=status.HTTP_200_OK
+            )
+
+        except BusinessException as e:
+            # Dynamic status code mapping
+            status_code = status.HTTP_400_BAD_REQUEST
+            if "locked" in str(e).lower():
+                status_code = status.HTTP_429_TOO_MANY_REQUESTS
+                
+            return Response(
+                {"status": "error", "message": str(e)}, 
+                status=status_code
+            )
+            
+        except Exception:
+            logger.exception(f"Unexpected error verifying OTP for {identifier}")
+            return Response(
+                {"status": "error", "message": ERROR_MESSAGES["SYSTEM_ERROR"]},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+# ==================== PASSWORD RESET VIEWS ====================
+
+class ForgotPasswordView(APIView):
+    """
+    POST /api/auth/password/forgot/
+    Accepts identifier (email or phone). Channel auto-detected. Always returns 200.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "forgot_password"
+
+    @swagger_auto_schema(request_body=ForgotPasswordSerializer)
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        identifier = serializer.validated_data["identifier"]
+
+        # extract IP via ipware — not XFF header
+        ip = _extract_ip(request)
+        ua = _extract_ua(request)
+
+        try:
+            PasswordResetService.request_reset(identifier, ip=ip, user_agent=ua)
+        except BusinessException as exc:
+            if "Too many" in str(exc):
+                return Response(
+                    {"detail": str(exc)},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+            # All other errors silenced — always return 200
+
+        return Response(
+            {"detail": "If an account with that identifier exists, a reset link has been sent."},
+            status=status.HTTP_200_OK,
+        )
+
+    def throttled(self, request, wait):
+        from rest_framework.exceptions import Throttled
+        raise Throttled(detail=f"Too many reset requests. Expected available in {wait} seconds.")
+
+
+class ValidateResetTokenView(APIView):
+    """
+    GET /api/auth/password/validate-reset-token/?token=<raw_token>
+    Stateless pre-flight only — no select_for_update().
+    Returns { "valid": true/false } only.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "otp_verify"  # reuse IP-level backstop
+
+    def get(self, request):
+        serializer = ValidateResetTokenSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        raw_token = serializer.validated_data["token"]
+
+        try:
+            PasswordResetService.validate_token(raw_token)
+            return Response({"valid": True}, status=status.HTTP_200_OK)
+        except BusinessException:
+            return Response(
+                {"valid": False, "error": "invalid_or_expired_token"},
+                status=status.HTTP_200_OK,
+            )
+
+
+class ResetPasswordView(APIView):
+    """
+    POST /api/auth/password/reset/
+    Consumes token atomically. Token marked used before password write.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "forgot_password"
+
+    @swagger_auto_schema(request_body=ResetPasswordSerializer)
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        raw_token = serializer.validated_data["token"]
+        new_password = serializer.validated_data["new_password"]
+        confirm_password = serializer.validated_data["confirm_password"]
+
+        if new_password != confirm_password:
+            return Response(
+                {"error": "password_mismatch"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # extract IP via ipware
+        ip = _extract_ip(request)
+        ua = _extract_ua(request)
+
+        try:
+            PasswordResetService.consume_and_reset(raw_token, new_password, ip=ip, user_agent=ua)
+            return Response(
+                {"success": True, "detail": "Password has been reset successfully."},
+                status=status.HTTP_200_OK,
+            )
+        except BusinessException as exc:
+            return Response(
+                {"error": "token_invalid", "detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValidationError as exc:
+            return Response(exc.detail, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception("Unexpected error during password reset")
+            return Response(
+                {"error": "reset_failed"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class ChangePasswordView(APIView):
+    """
+    POST /api/auth/password/change/
+    Requires authenticated JWT. Verifies old password, checks history.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_change"
+
+    @swagger_auto_schema(request_body=ChangePasswordSerializer)
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        old_password = serializer.validated_data["old_password"]
+        new_password = serializer.validated_data["new_password"]
+        confirm_password = serializer.validated_data["confirm_password"]
+
+        if new_password != confirm_password:
+            return Response(
+                {"error": "password_mismatch"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # extract IP via ipware
+        ip = _extract_ip(request)
+        ua = _extract_ua(request)
+
+        try:
+            PasswordChangeService.change_password(
+                request.user, old_password, new_password, ip=ip, user_agent=ua
+            )
+            return Response(
+                {"success": True, "detail": "Password changed successfully."},
+                status=status.HTTP_200_OK,
+            )
+        except BusinessException as exc:
+            err_str = str(exc)
+            if "wrong_password" in err_str:
+                return Response({"error": "wrong_password"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": err_str}, status=status.HTTP_400_BAD_REQUEST)
