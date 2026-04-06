@@ -5,4 +5,4 @@ buildCommand = "pip install -r ../requirements.txt"
 # cache bust: 1
 
 [deploy]
-startCommand = "mkdir -p /app/backend/config/geoip && curl -L "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" -o /app/backend/config/geoip/GeoLite2-City.tar.gz && tar -xzf /app/backend/config/geoip/GeoLite2-City.tar.gz -C /app/backend/config/geoip && celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
+startCommand = "mkdir -p /app/backend/config/geoip && curl -sL "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" -o /app/backend/config/geoip/GeoLite2-City.tar.gz && tar -xzf /app/backend/config/geoip/GeoLite2-City.tar.gz -C /app/backend/config/geoip && mv /app/backend/config/geoip/GeoLite2-City_*/*.mmdb /app/backend/config/geoip/GeoLite2-City.mmdb && rm -rf /app/backend/config/geoip/GeoLite2-City.tar.gz /app/backend/config/geoip/GeoLite2-City_*/ && cd /app/backend && celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
