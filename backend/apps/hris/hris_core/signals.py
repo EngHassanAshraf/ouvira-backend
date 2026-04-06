@@ -11,5 +11,5 @@ def nullify_employee_user_id(sender, instance, **kwargs):
     TenantModel = get_tenant_model()
     for tenant in TenantModel.objects.exclude(schema_name='public'):
         with schema_context(tenant.schema_name):
-            from apps.hris.core.models import Employee
+            from apps.hris.hris_core.models import Employee
             Employee.objects.filter(user_id=instance.pk).update(user_id=None)

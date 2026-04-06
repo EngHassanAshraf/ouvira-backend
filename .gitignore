@@ -1,15 +1,14 @@
 *.pyc
 db.sqlite3
 .env
-
 __pycache__/
 venv/
 staticfiles/
 entrprise_service/
-geoip/
 
 .vscode/
 .idea/
-
 # Docker
 backend/tmp_test_timezone.py
+geoip
+railway_services_env/

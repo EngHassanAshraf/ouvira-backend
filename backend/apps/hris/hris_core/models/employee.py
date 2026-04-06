@@ -25,6 +25,22 @@ class Employee(TimeStampedModel, SoftDeleteModel):
     )
 
     company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="employees")
+    department = models.ForeignKey(
+        'hris_core.Department',  # Ilova nomi va Model nomi
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='employees',
+        verbose_name="Bo'lim"
+    )
+    location = models.ForeignKey(
+        'hris_core.Location',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employees",
+        verbose_name=_("Work Location")
+    )
 
     # Asosiy ma'lumotlar
     employee_id = models.CharField(max_length=50, verbose_name=_("Employee ID"))  # Masalan: EMP-001

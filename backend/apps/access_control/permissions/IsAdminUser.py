@@ -16,7 +16,7 @@ class IsAdminUser(BasePermission):
             return False
 
         # Check both request body (POST) and query params (DELETE)
-        company_id = request.data.get("company") or request.query_params.get("company")
+        company_id = request.data.get("company") or request.query_params.get("company")or getattr(request.tenant, "id", None)
 
         # Early return if company_id is missing
         if not company_id:
