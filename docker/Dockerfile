@@ -35,12 +35,15 @@ COPY ./backend .
 COPY ./docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # Download GeoLite2-City at build time into an immutable layer immune to volume mounts
+# This step is optional - the application will gracefully handle missing GeoIP database
 ARG MAXMIND_LICENSE_KEY
 RUN mkdir -p /var/opt/geoip && \
     if [ -n "$MAXMIND_LICENSE_KEY" ]; then \
     echo "Downloading GeoLite2-City..." && \
-    curl -Ls --fail "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" \
-    | tar -xz --strip-components=1 -C /var/opt/geoip --wildcards "*.mmdb"; \
+    (curl -Ls --fail "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" \
+    | tar -xz --strip-components=1 -C /var/opt/geoip --wildcards "*.mmdb") \
+    && echo "GeoLite2-City downloaded successfully." \
+    || echo "WARNING: GeoLite2-City download failed. GeoIP will use fallback behavior. Check MAXMIND_LICENSE_KEY."; \
     else \
     echo "MAXMIND_LICENSE_KEY not set. GeoIP will gracefully fallback."; \
     fi
