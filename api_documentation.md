@@ -1,30 +1,150 @@
 # Ouvira API Documentation
 
-**Base URL:** `http://localhost:8000` | **Content-Type:** `application/json`
+**Version:** 1.0.0  
+**Base URL:** `http://localhost:8000` (development) | `https://api.ouvira.com` (production)  
+**Content-Type:** `application/json`
 
-**Headers required on all authenticated endpoints:**
+---
+
+## 📋 Table of Contents
+
+1. [API Overview](#api-overview)
+2. [Authentication](#authentication)
+3. [Error Handling](#error-handling)
+4. [Endpoints](#endpoints)
+   - [Authentication](#1-authentication---apiauth)
+   - [Account Management](#2-account-management---apiaccount)
+   - [Access Control](#3-access-control---apiaccess-control)
+   - [Company](#4-company---apicompany)
+   - [Audit](#5-audit---apiaudit)
+   - [HRIS Core](#6-hris-core---apihris)
+   - [Recruitment](#7-recruitment---apihrisrecruitment)
+5. [Pagination](#pagination)
+6. [Rate Limiting](#rate-limiting)
+
+---
+
+## API Overview
+
+### Versioning
+The API uses URL-based versioning. All endpoints are prefixed with `/api/`.
+
+### Required Headers
+
+All authenticated endpoints require:
 ```
 Authorization: Bearer <access_token>
 X-Tenant: <tenant_subdomain>
 ```
 
-**Pagination** — all list endpoints return `{ "count", "next", "previous", "results" }` with 20 items per page. Use `?page=N`.
+### Response Format
 
-**Errors** — `{"detail": "..."}` or `{"field": ["error1"]}` with HTTP 400/401/403/404/429.
+**Success Response:**
+```json
+{
+  "id": 1,
+  "field": "value",
+  "created_at": "2026-01-15T10:00:00Z"
+}
+```
 
-| Token | Lifetime |
-|-------|----------|
-| Access | 1 hour |
-| Refresh | 7 days (rotated) |
+**List Response:**
+```json
+{
+  "count": 100,
+  "next": "http://api.ouvira.com/endpoint?page=2",
+  "previous": null,
+  "results": [...]
+}
+```
+
+**Error Response:**
+```json
+{
+  "detail": "Error message here"
+}
+```
+
+or
+
+```json
+{
+  "field_name": ["Error message for this field"]
+}
+```
 
 ---
 
-# 1. Authentication — `api/auth/`
+## Authentication
+
+### Token Lifecycle
+
+| Token Type | Lifetime | Usage |
+|------------|----------|-------|
+| Access Token | 1 hour | API authentication |
+| Refresh Token | 7 days | Obtain new access token |
+
+### Obtaining Tokens
+
+1. **Signup Flow:**
+   - `POST /api/auth/signup/` → OTP sent
+   - `POST /api/auth/finalize-signin/` → Tokens returned
+
+2. **Login Flow:**
+   - `POST /api/auth/login/` → Tokens returned (or 2FA required)
+   - If 2FA enabled: `POST /api/auth/login-2fa-verify-code/` → Tokens returned
+
+### Using Tokens
+
+Include in all authenticated requests:
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
 
 ---
 
-### POST `/api/auth/signup/`
+## Error Handling
+
+### HTTP Status Codes
+
+| Code | Meaning | Description |
+|------|---------|-------------|
+| 200 | OK | Successful request |
+| 201 | Created | Resource created successfully |
+| 204 | No Content | Successful deletion |
+| 400 | Bad Request | Invalid input data |
+| 401 | Unauthorized | Missing or invalid authentication |
+| 403 | Forbidden | Insufficient permissions |
+| 404 | Not Found | Resource not found |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 500 | Internal Server Error | Server error |
+
+### Error Response Format
+
+```json
+{
+  "detail": "Human-readable error message"
+}
+```
+
+For validation errors:
+```json
+{
+  "email": ["Enter a valid email address."],
+  "password": ["This field is required."]
+}
+```
+
+---
+
+## Endpoints
+
+### 1. Authentication — `/api/auth/`
+
+#### POST `/api/auth/signup/`
 **Auth:** None | **Rate:** 3/hour
+
+Start the signup process by sending an OTP.
 
 **Request:**
 ```json
@@ -44,9 +164,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-
-### POST `/api/auth/finalize-signin/`
+#### POST `/api/auth/finalize-signin/`
 **Auth:** None | **Rate:** 3/hour
+
+Complete signup after OTP verification.
 
 **Request:**
 ```json
@@ -70,10 +191,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/login/`
+#### POST `/api/auth/login/`
 **Auth:** None | **Rate:** 5/min
 
-> `identifier` accepts email or phone number.
+Login with email or phone number.
 
 **Request:**
 ```json
@@ -109,8 +230,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/token/refresh/`
+#### POST `/api/auth/token/refresh/`
 **Auth:** None | **Rate:** 20/min
+
+Refresh access token using refresh token.
 
 **Request:**
 ```json
@@ -129,8 +252,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/logout/`
+#### POST `/api/auth/logout/`
 **Auth:** Bearer Token
+
+Logout and blacklist the refresh token.
 
 **Request:**
 ```json
@@ -148,8 +273,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/settings_enable-2fa/`
+#### POST `/api/auth/settings_enable-2fa/`
 **Auth:** Bearer Token | **Rate:** 10/hour
+
+Enable two-factor authentication.
 
 **Request:**
 ```json
@@ -169,8 +296,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/login-2fa-verify-code/`
+#### POST `/api/auth/login-2fa-verify-code/`
 **Auth:** None | **Rate:** 5/min
+
+Verify 2FA code during login.
 
 **Request:**
 ```json
@@ -192,8 +321,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/login-2fa-verify-backup/`
+#### POST `/api/auth/login-2fa-verify-backup/`
 **Auth:** None | **Rate:** 5/min
+
+Verify backup code during login.
 
 **Request:**
 ```json
@@ -215,9 +346,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/otp/send/`
+#### POST `/api/auth/otp/send/`
 **Auth:** None | **Rate:** 1/min
-> Submits an OTP via email or SMS depending on the detected format of the `identifier`.
+
+Send OTP via email or SMS.
 
 **Request:**
 ```json
@@ -235,9 +367,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/otp/verify/`
+#### POST `/api/auth/otp/verify/`
 **Auth:** None | **Rate:** 5/min
-> Validates the OTP securely (HMAC) and returns a success payload, advancing the user to login or finalized-signup.
+
+Verify OTP.
 
 **Request:**
 ```json
@@ -256,8 +389,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/password/forgot/`
+#### POST `/api/auth/password/forgot/`
 **Auth:** None | **Rate:** 3/hour
+
+Request password reset.
 
 **Request:**
 ```json
@@ -275,11 +410,12 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### GET `/api/auth/password/validate-reset-token/`
-**Auth:** None | **Rate:** Rate-limited at ingress
+#### GET `/api/auth/password/validate-reset-token/`
+**Auth:** None
 
-**Request Query Param:**
-`?token=b4b2c1d3...`
+Validate password reset token.
+
+**Query Params:** `?token=b4b2c1d3...`
 
 **Response (200):**
 ```json
@@ -290,8 +426,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/password/reset/`
-**Auth:** None | **Rate:** 3/hour (Shared with forgot)
+#### POST `/api/auth/password/reset/`
+**Auth:** None | **Rate:** 3/hour
+
+Reset password with token.
 
 **Request:**
 ```json
@@ -310,8 +448,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### POST `/api/auth/password/change/`
+#### POST `/api/auth/password/change/`
 **Auth:** Bearer Token | **Rate:** 10/hour
+
+Change password (when current password is known).
 
 **Request:**
 ```json
@@ -330,12 +470,12 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-# 2. Account Management — `api/account/`
+### 2. Account Management — `/api/account/`
 
----
-
-### GET `/api/account/profile/`
+#### GET `/api/account/profile/`
 **Auth:** Bearer Token
+
+Get current user profile.
 
 **Response (200):**
 ```json
@@ -357,8 +497,10 @@ X-Tenant: <tenant_subdomain>
 
 ---
 
-### PUT/PATCH `/api/account/profile/`
+#### PUT/PATCH `/api/account/profile/`
 **Auth:** Bearer Token
+
+Update user profile.
 
 **Request:**
 ```json
@@ -368,14 +510,16 @@ X-Tenant: <tenant_subdomain>
 }
 ```
 
-**Response (200):**
-_Returns full user profile json block._
+**Response (200):** Returns full user profile.
 
 ---
 
-### GET `/api/account/users/`
+#### GET `/api/account/users/`
 **Auth:** Bearer + Admin
-> Lists all active system users. Intended for administrative directory lookups. Optionally filter by `?company=<id>`.
+
+List all active system users.
+
+**Query Params:** `?company=<id>`
 
 **Response (200):**
 ```json
@@ -399,65 +543,20 @@ _Returns full user profile json block._
 
 ---
 
-# 3. Access Control — `api/access-control/`
+### 3. Access Control — `/api/access-control/`
 
----
+#### Permissions
 
-### GET `/api/access-control/permissions/`
-**Auth:** Bearer + Admin
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/access-control/permissions/` | List all permissions |
+| POST | `/api/access-control/permissions/` | Create permission |
+| GET | `/api/access-control/permissions/{id}/` | Get permission details |
+| PUT | `/api/access-control/permissions/{id}/` | Update permission |
+| PATCH | `/api/access-control/permissions/{id}/` | Partial update |
+| DELETE | `/api/access-control/permissions/{id}/` | Delete permission |
 
-**Response (200):**
-```json
-{
-  "count": 2,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "code": "can_edit_company",
-      "module": "company",
-      "description": "Can edit company details",
-      "created_at": "2026-01-15T10:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### POST `/api/access-control/permissions/`
-**Auth:** Bearer + Admin
-
-**Request:**
-```json
-{
-  "code": "can_create_invoice",
-  "module": "billing",
-  "description": "Can create new invoices"
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 3,
-  "code": "can_create_invoice",
-  "module": "billing",
-  "description": "Can create new invoices",
-  "created_at": "2026-02-17T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### GET `/api/access-control/permissions/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (200):**
+**Permission Object:**
 ```json
 {
   "id": 1,
@@ -465,132 +564,24 @@ _Returns full user profile json block._
   "module": "company",
   "description": "Can edit company details",
   "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-01-15T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
+  "updated_at": "2026-01-15T10:00:00Z"
 }
 ```
 
 ---
 
-### PUT `/api/access-control/permissions/{id}/`
-**Auth:** Bearer + Admin
+#### Roles
 
-**Request:**
-```json
-{
-  "code": "can_edit_company",
-  "module": "company",
-  "description": "Updated description here"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/access-control/roles/` | List all roles |
+| POST | `/api/access-control/roles/` | Create role |
+| GET | `/api/access-control/roles/{id}/` | Get role details |
+| PUT | `/api/access-control/roles/{id}/` | Update role |
+| PATCH | `/api/access-control/roles/{id}/` | Partial update |
+| DELETE | `/api/access-control/roles/{id}/` | Delete role |
 
-**Response (200):**
-```json
-{
-  "id": 1,
-  "code": "can_edit_company",
-  "module": "company",
-  "description": "Updated description here",
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### PATCH `/api/access-control/permissions/{id}/`
-**Auth:** Bearer + Admin
-
-**Request:**
-```json
-{
-  "description": "Partial update description"
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "code": "can_edit_company",
-  "module": "company",
-  "description": "Partial update description",
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### DELETE `/api/access-control/permissions/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (204):** No content
-
----
-
-### GET `/api/access-control/roles/`
-**Auth:** Bearer + Admin
-
-**Response (200):**
-```json
-{
-  "count": 3,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "role": "Editor",
-      "desc": "Can edit content",
-      "company": 1,
-      "is_system_role": false,
-      "created_at": "2026-01-15T10:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### POST `/api/access-control/roles/`
-**Auth:** Bearer + Admin
-
-**Request:**
-```json
-{
-  "role": "Viewer",
-  "desc": "Read-only access",
-  "company": 1
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 4,
-  "role": "Viewer",
-  "desc": "Read-only access",
-  "company": 1,
-  "is_system_role": false,
-  "created_at": "2026-02-17T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### GET `/api/access-control/roles/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (200):**
+**Role Object:**
 ```json
 {
   "id": 1,
@@ -599,1129 +590,304 @@ _Returns full user profile json block._
   "company": 1,
   "is_system_role": false,
   "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-01-15T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
+  "updated_at": "2026-01-15T10:00:00Z"
 }
 ```
 
 ---
 
-### PUT `/api/access-control/roles/{id}/`
-**Auth:** Bearer + Admin
+#### Role Permissions
 
-**Request:**
-```json
-{
-  "role": "Editor",
-  "desc": "Updated: can edit and publish content",
-  "company": 1
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/access-control/role-permissions/` | List role permissions |
+| POST | `/api/access-control/role-permissions/` | Assign permission to role |
+| DELETE | `/api/access-control/role-permissions/{id}/` | Remove permission from role |
 
-**Response (200):**
+---
+
+#### User Companies
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/access-control/user-companies/` | List user-company associations |
+| POST | `/api/access-control/user-companies/` | Associate user with company |
+| GET | `/api/access-control/user-companies/{id}/` | Get association details |
+| PUT | `/api/access-control/user-companies/{id}/` | Update association |
+| DELETE | `/api/access-control/user-companies/{id}/` | Remove association |
+
+---
+
+#### User Company Roles
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/access-control/user-company-roles/` | List user roles in companies |
+| POST | `/api/access-control/user-company-roles/` | Assign role to user in company |
+| DELETE | `/api/access-control/user-company-roles/{id}/` | Remove role from user |
+
+---
+
+#### Invitations
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/access-control/invitations/` | List invitations |
+| POST | `/api/access-control/invitations/` | Create invitation |
+| GET | `/api/access-control/invitations/{id}/` | Get invitation details |
+| PUT | `/api/access-control/invitations/{id}/` | Update invitation |
+| DELETE | `/api/access-control/invitations/{id}/` | Revoke invitation |
+| POST | `/api/access-control/invitations/accept/` | Accept invitation |
+| POST | `/api/access-control/invitations/{id}/resend/` | Resend invitation |
+
+**Invitation Object:**
 ```json
 {
   "id": 1,
-  "role": "Editor",
-  "desc": "Updated: can edit and publish content",
-  "company": 1,
-  "is_system_role": false,
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### PATCH `/api/access-control/roles/{id}/`
-**Auth:** Bearer + Admin
-
-**Request:**
-```json
-{
-  "desc": "Partial update to role description"
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "role": "Editor",
-  "desc": "Partial update to role description",
-  "company": 1,
-  "is_system_role": false,
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### DELETE `/api/access-control/roles/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (204):** No content
-
----
-
-### GET `/api/access-control/role-permissions/`
-**Auth:** Bearer + Admin
-
-**Response (200):**
-```json
-{
-  "count": 2,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "role": 1,
-      "permission": 2,
-      "created_at": "2026-01-15T10:00:00Z",
-      "updated_at": "2026-01-15T10:00:00Z",
-      "deleted_at": null,
-      "is_deleted": false
-    }
-  ]
-}
-```
-
----
-
-### POST `/api/access-control/role-permissions/`
-**Auth:** Bearer + Admin
-
-**Request:**
-```json
-{
-  "role": 1,
-  "permission": 3
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 5,
-  "role": 1,
-  "permission": 3,
-  "created_at": "2026-02-17T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### GET `/api/access-control/role-permissions/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "role": 1,
-  "permission": 2,
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-01-15T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### DELETE `/api/access-control/role-permissions/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (204):** No content
-
----
-
-### GET `/api/access-control/user-companies/`
-**Auth:** Bearer + Admin
-
-**Response (200):**
-```json
-{
-  "count": 2,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "user": 1,
-      "company": 1,
-      "is_active": true,
-      "joined_at": "2026-01-15T10:00:00Z",
-      "created_at": "2026-01-15T10:00:00Z",
-      "updated_at": "2026-01-15T10:00:00Z",
-      "deleted_at": null,
-      "is_deleted": false
-    }
-  ]
-}
-```
-
----
-
-### POST `/api/access-control/user-companies/`
-**Auth:** Bearer + Admin
-
-**Request:**
-```json
-{
-  "user": 5,
-  "company": 1
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 3,
-  "user": 5,
-  "company": 1,
-  "is_active": true,
-  "joined_at": "2026-02-17T10:00:00Z",
-  "created_at": "2026-02-17T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### GET `/api/access-control/user-companies/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "user": 1,
-  "company": 1,
-  "is_active": true,
-  "joined_at": "2026-01-15T10:00:00Z",
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-01-15T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### PUT `/api/access-control/user-companies/{id}/`
-**Auth:** Bearer + Admin
-
-**Request:**
-```json
-{
-  "user": 1,
-  "company": 1,
-  "is_active": false
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "user": 1,
-  "company": 1,
-  "is_active": false,
-  "joined_at": "2026-01-15T10:00:00Z",
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### DELETE `/api/access-control/user-companies/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (204):** No content
-
----
-
-### GET `/api/access-control/user-company-roles/`
-**Auth:** Bearer + Admin
-
-**Response (200):**
-```json
-{
-  "count": 1,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "user_company": {
-        "id": 1,
-        "user": 1,
-        "company": 1,
-        "is_active": true
-      },
-      "role": {
-        "id": 1,
-        "role": "Editor",
-        "desc": "Can edit content",
-        "company": 1
-      },
-      "assigned_at": "2026-01-15T10:00:00Z",
-      "created_at": "2026-01-15T10:00:00Z",
-      "updated_at": "2026-01-15T10:00:00Z",
-      "deleted_at": null,
-      "is_deleted": false
-    }
-  ]
-}
-```
-
----
-
-### POST `/api/access-control/user-company-roles/`
-**Auth:** Bearer + Admin
-
-**Request:**
-```json
-{
-  "user_company": 1,
-  "role": 2
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 2,
-  "user_company": 1,
-  "role": 2,
-  "assigned_at": "2026-02-17T10:00:00Z",
-  "created_at": "2026-02-17T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### GET `/api/access-control/user-company-roles/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "user_company": {
-    "id": 1,
-    "user": 1,
-    "company": 1,
-    "is_active": true
-  },
-  "role": {
-    "id": 1,
-    "role": "Editor",
-    "desc": "Can edit content",
-    "company": 1
-  },
-  "assigned_at": "2026-01-15T10:00:00Z",
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-01-15T10:00:00Z",
-  "deleted_at": null,
-  "is_deleted": false
-}
-```
-
----
-
-### DELETE `/api/access-control/user-company-roles/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (204):** No content
-
----
-
-### GET `/api/access-control/invitations/`
-**Auth:** Bearer + Admin | **Query Params:** `?company=1&status=pending`
-
-**Response (200):**
-```json
-{
-  "count": 1,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "email": "newuser@example.com",
-      "company": 1,
-      "role": 2,
-      "status": "pending",
-      "expires_at": "2026-03-01T00:00:00Z",
-      "created_at": "2026-02-17T10:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### POST `/api/access-control/invitations/`
-**Auth:** Bearer + Admin
-
-**Request:**
-```json
-{
   "email": "newuser@example.com",
   "company": 1,
   "role": 2,
-  "expires_at": "2026-03-01T00:00:00Z"
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 2,
-  "email": "newuser@example.com",
-  "company": 1,
-  "role": 2,
-  "token": "auto-generated-token",
   "status": "pending",
   "expires_at": "2026-03-01T00:00:00Z",
-  "invited_by": 1,
-  "accepted_by": null,
   "created_at": "2026-02-17T10:00:00Z"
 }
 ```
 
 ---
 
-### GET `/api/access-control/invitations/{id}/`
-**Auth:** Bearer + Admin
+### 4. Company — `/api/company/`
 
-**Response (200):**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/company/` | List companies |
+| POST | `/api/company/` | Create company |
+| GET | `/api/company/{id}/` | Get company details |
+| PUT | `/api/company/{id}/` | Update company |
+| PATCH | `/api/company/{id}/` | Partial update |
+| DELETE | `/api/company/{id}/` | Delete company (owner only) |
+| GET | `/api/company/{id}/settings/` | Get company settings |
+| PUT | `/api/company/{id}/settings/` | Update company settings |
+
+---
+
+### 5. Audit — `/api/audit/`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/audit/notifications/` | List notifications |
+| POST | `/api/audit/notifications/mark-read/` | Mark notifications as read |
+| GET | `/api/audit/activity-logs/` | List activity logs (admin) |
+| GET | `/api/audit/activity-logs/my/` | List my activity logs |
+| GET | `/api/audit/security-logs/` | List security logs |
+
+---
+
+### 6. HRIS Core — `/api/hris/`
+
+#### Employees
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/hris/employees/` | List employees |
+| POST | `/api/hris/employees/` | Create employee |
+| GET | `/api/hris/employees/{id}/` | Get employee details |
+| PUT | `/api/hris/employees/{id}/` | Update employee |
+| PATCH | `/api/hris/employees/{id}/` | Partial update |
+| DELETE | `/api/hris/employees/{id}/` | Soft delete employee |
+
+**Employee Object:**
 ```json
 {
   "id": 1,
-  "email": "newuser@example.com",
+  "employee_id": "EMP-001",
+  "first_name": "Ahmed",
+  "last_name": "Mohamed",
+  "national_id": "1234567890",
+  "passport_number": "A12345678",
+  "nationality": "Saudi Arabian",
+  "date_of_birth": "1990-01-15",
+  "gender": "M",
+  "marital_status": "M",
+  "contact_number": "+966501234567",
+  "personal_email": "ahmed@example.com",
   "company": 1,
-  "role": 2,
-  "token": "invitation-token",
-  "status": "pending",
-  "expires_at": "2026-03-01T00:00:00Z",
-  "invited_by": 1,
-  "accepted_by": null,
-  "created_at": "2026-02-17T10:00:00Z"
-}
-```
-
----
-
-### PUT `/api/access-control/invitations/{id}/`
-**Auth:** Bearer + Admin
-
-**Request:**
-```json
-{
-  "email": "newuser@example.com",
-  "company": 1,
-  "role": 3,
-  "expires_at": "2026-04-01T00:00:00Z"
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "email": "newuser@example.com",
-  "company": 1,
-  "role": 3,
-  "token": "invitation-token",
-  "status": "pending",
-  "expires_at": "2026-04-01T00:00:00Z",
-  "invited_by": 1,
-  "accepted_by": null,
-  "created_at": "2026-02-17T10:00:00Z"
-}
-```
-
----
-
-### DELETE `/api/access-control/invitations/{id}/`
-**Auth:** Bearer + Admin
-
-**Response (204):** No content
-
----
-
-### POST `/api/access-control/invitations/accept/`
-**Auth:** Bearer Token
-
-**Request:**
-```json
-{
-  "token": "invitation-token-string"
-}
-```
-
-**Response (200):**
-```json
-{
-  "detail": "Invitation accepted successfully."
-}
-```
-
----
-
-### POST `/api/access-control/invitations/{id}/revoke/`
-**Auth:** Bearer + Admin
-
-**Request:** *(empty body)*
-
-**Response (200):**
-```json
-{
-  "detail": "Invitation revoked."
-}
-```
-
----
-
-### POST `/api/access-control/invitations/{id}/resend/`
-**Auth:** Bearer + Admin
-
-**Request:** *(empty body)*
-
-**Response (200):**
-```json
-{
-  "detail": "Invitation resent."
-}
-```
-
----
-
-# 3. Company — `api/company/`
-
----
-
-### GET `/api/company/`
-**Auth:** Bearer Token
-
-**Response (200):**
-```json
-{
-  "count": 1,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "name": "Ouvira Inc.",
-      "logo": null,
-      "status": "active",
-      "is_parent_company": true,
-      "created_at": "2026-01-15T10:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### POST `/api/company/`
-**Auth:** Bearer Token
-
-**Request:**
-```json
-{
-  "name": "Ouvira Inc.",
-  "description": "A technology company",
-  "address": "Cairo, Egypt",
-  "parent_company": null,
-  "is_parent_company": true
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 1,
-  "name": "Ouvira Inc.",
-  "logo": null,
-  "create_by": 1,
-  "parent_company": null,
-  "is_parent_company": true,
-  "description": "A technology company",
-  "address": "Cairo, Egypt",
-  "status": "active",
-  "settings": {
-    "id": 1,
-    "default_language": "",
-    "default_currency": "",
-    "timezone": "",
-    "fiscal_year_start_month": 1,
-    "feature_flags": {}
-  },
-  "created_at": "2026-02-17T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z"
-}
-```
-
----
-
-### GET `/api/company/{id}/`
-**Auth:** Bearer Token
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "name": "Ouvira Inc.",
-  "logo": null,
-  "create_by": 1,
-  "parent_company": null,
-  "is_parent_company": true,
-  "description": "A technology company",
-  "address": "Cairo, Egypt",
-  "status": "active",
-  "settings": {
-    "id": 1,
-    "default_language": "en",
-    "default_currency": "EGP",
-    "timezone": "Africa/Cairo",
-    "fiscal_year_start_month": 1,
-    "feature_flags": {}
-  },
+  "user": 1,
+  "location": 1,
+  "department": 1,
   "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-02-17T10:00:00Z"
+  "updated_at": "2026-01-15T10:00:00Z"
 }
 ```
 
 ---
 
-### PUT `/api/company/{id}/`
-**Auth:** Bearer + Admin/Owner
+#### Departments
 
-> Status transitions: `active` → `deactivated`, `deactivated` → `active` or `deleted`
-
-**Request:**
-```json
-{
-  "name": "Ouvira Inc.",
-  "description": "Updated description",
-  "address": "New Cairo, Egypt",
-  "parent_company": null,
-  "is_parent_company": true,
-  "status": "active"
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "name": "Ouvira Inc.",
-  "logo": null,
-  "create_by": 1,
-  "parent_company": null,
-  "is_parent_company": true,
-  "description": "Updated description",
-  "address": "New Cairo, Egypt",
-  "status": "active",
-  "settings": { "..." : "..." },
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-02-17T12:00:00Z"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/hris/departments/` | List departments |
+| POST | `/api/hris/departments/` | Create department |
+| GET | `/api/hris/departments/{id}/` | Get department details |
+| PUT | `/api/hris/departments/{id}/` | Update department |
+| PATCH | `/api/hris/departments/{id}/` | Partial update |
+| DELETE | `/api/hris/departments/{id}/` | Soft delete department |
 
 ---
 
-### PATCH `/api/company/{id}/`
-**Auth:** Bearer + Admin/Owner
+#### Positions
 
-**Request:**
-```json
-{
-  "description": "Partially updated description"
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "name": "Ouvira Inc.",
-  "logo": null,
-  "create_by": 1,
-  "parent_company": null,
-  "is_parent_company": true,
-  "description": "Partially updated description",
-  "address": "Cairo, Egypt",
-  "status": "active",
-  "settings": { "..." : "..." },
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-02-17T12:00:00Z"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/hris/positions/` | List positions |
+| POST | `/api/hris/positions/` | Create position |
+| GET | `/api/hris/positions/{id}/` | Get position details |
+| PUT | `/api/hris/positions/{id}/` | Update position |
+| PATCH | `/api/hris/positions/{id}/` | Partial update |
+| DELETE | `/api/hris/positions/{id}/` | Soft delete position |
 
 ---
 
-### DELETE `/api/company/{id}/`
-**Auth:** Bearer + Owner only (soft delete)
+#### Locations
 
-**Response (204):** No content
-
----
-
-### GET `/api/company/{id}/settings/`
-**Auth:** Bearer Token
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "company": 1,
-  "default_language": "en",
-  "default_currency": "EGP",
-  "timezone": "Africa/Cairo",
-  "fiscal_year_start_month": 1,
-  "feature_flags": {},
-  "updated_at": "2026-02-17T10:00:00Z"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/hris/locations/` | List locations |
+| POST | `/api/hris/locations/` | Create location |
+| GET | `/api/hris/locations/{id}/` | Get location details |
+| PUT | `/api/hris/locations/{id}/` | Update location |
+| PATCH | `/api/hris/locations/{id}/` | Partial update |
+| DELETE | `/api/hris/locations/{id}/` | Soft delete location |
 
 ---
 
-### PUT `/api/company/{id}/settings/`
-**Auth:** Bearer + Admin/Owner
+#### Attendance
 
-**Request:**
-```json
-{
-  "default_language": "ar",
-  "default_currency": "EGP",
-  "timezone": "Africa/Cairo",
-  "fiscal_year_start_month": 7,
-  "feature_flags": {
-    "dark_mode": true,
-    "beta_features": false
-  }
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "company": 1,
-  "default_language": "ar",
-  "default_currency": "EGP",
-  "timezone": "Africa/Cairo",
-  "fiscal_year_start_month": 7,
-  "feature_flags": {
-    "dark_mode": true,
-    "beta_features": false
-  },
-  "updated_at": "2026-02-17T12:00:00Z"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/hris/attendance/` | List attendance records |
+| POST | `/api/hris/attendance/` | Create attendance record |
+| GET | `/api/hris/attendance/{id}/` | Get attendance details |
+| PUT | `/api/hris/attendance/{id}/` | Update attendance record |
+| PATCH | `/api/hris/attendance/{id}/` | Partial update |
+| DELETE | `/api/hris/attendance/{id}/` | Soft delete attendance record |
 
 ---
 
-### PATCH `/api/company/{id}/settings/`
-**Auth:** Bearer + Admin/Owner
+### 7. Recruitment — `/api/hris/recruitment/`
 
-**Request:**
-```json
-{
-  "default_language": "fr"
-}
-```
+#### Hiring Requests
 
-**Response (200):**
-```json
-{
-  "id": 1,
-  "company": 1,
-  "default_language": "fr",
-  "default_currency": "EGP",
-  "timezone": "Africa/Cairo",
-  "fiscal_year_start_month": 7,
-  "feature_flags": {
-    "dark_mode": true,
-    "beta_features": false
-  },
-  "updated_at": "2026-02-17T13:00:00Z"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/hris/recruitment/hiring-requests/` | List hiring requests |
+| POST | `/api/hris/recruitment/hiring-requests/` | Create hiring request |
+| GET | `/api/hris/recruitment/hiring-requests/{id}/` | Get hiring request details |
+| PUT | `/api/hris/recruitment/hiring-requests/{id}/` | Update hiring request |
+| PATCH | `/api/hris/recruitment/hiring-requests/{id}/` | Partial update |
+| DELETE | `/api/hris/recruitment/hiring-requests/{id}/` | Soft delete hiring request |
 
 ---
 
-# 4. Account — `api/account/`
+#### Candidates
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/hris/recruitment/candidates/` | List candidates |
+| POST | `/api/hris/recruitment/candidates/` | Create candidate |
+| GET | `/api/hris/recruitment/candidates/{id}/` | Get candidate details |
+| PUT | `/api/hris/recruitment/candidates/{id}/` | Update candidate |
+| PATCH | `/api/hris/recruitment/candidates/{id}/` | Partial update |
+| DELETE | `/api/hris/recruitment/candidates/{id}/` | Soft delete candidate |
 
 ---
 
-### GET `/api/account/profile/`
-**Auth:** Bearer Token
+#### Job Applications
 
-**Response (200):**
-```json
-{
-  "id": 1,
-  "username": "hassan",
-  "full_name": "Hassan Ashraf",
-  "email": "hassan@example.com",
-  "primary_mobile": "+201234567890",
-  "email_verified": true,
-  "phone_verified": true,
-  "account_uid": "uuid-here",
-  "is_2fa_enabled": false,
-  "two_fa_type": null,
-  "date_joined": "2026-01-15T10:00:00Z",
-  "last_login": "2026-02-17T10:00:00Z"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/hris/recruitment/applications/` | List job applications |
+| POST | `/api/hris/recruitment/applications/` | Create job application |
+| GET | `/api/hris/recruitment/applications/{id}/` | Get application details |
+| PUT | `/api/hris/recruitment/applications/{id}/` | Update application |
+| PATCH | `/api/hris/recruitment/applications/{id}/` | Partial update |
+| DELETE | `/api/hris/recruitment/applications/{id}/` | Soft delete application |
 
 ---
 
-### PUT `/api/account/profile/`
-**Auth:** Bearer Token
+#### Interviews
 
-**Request:**
-```json
-{
-  "full_name": "Hassan Ahmed Ashraf",
-  "email": "newemail@example.com"
-}
-```
-
-**Response (200):**
-```json
-{
-  "full_name": "Hassan Ahmed Ashraf",
-  "email": "newemail@example.com"
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/hris/recruitment/interviews/` | List interviews |
+| POST | `/api/hris/recruitment/interviews/` | Create interview |
+| GET | `/api/hris/recruitment/interviews/{id}/` | Get interview details |
+| PUT | `/api/hris/recruitment/interviews/{id}/` | Update interview |
+| PATCH | `/api/hris/recruitment/interviews/{id}/` | Partial update |
+| DELETE | `/api/hris/recruitment/interviews/{id}/` | Soft delete interview |
 
 ---
 
-### PATCH `/api/account/profile/`
-**Auth:** Bearer Token
+## Pagination
 
-**Request:**
+All list endpoints support pagination with the following response format:
+
 ```json
 {
-  "full_name": "Hassan A. Ashraf"
-}
-```
-
-**Response (200):**
-```json
-{
-  "full_name": "Hassan A. Ashraf",
-  "email": "newemail@example.com"
-}
-```
-
----
-
-### GET `/api/account/users/`
-**Auth:** Bearer + Admin | **Query Params:** `?company=1`
-
-**Response (200):**
-```json
-{
-  "count": 5,
-  "next": null,
+  "count": 100,
+  "next": "http://api.ouvira.com/endpoint?page=2",
   "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "username": "hassan",
-      "full_name": "Hassan Ashraf",
-      "email": "hassan@example.com",
-      "primary_mobile": "+201234567890",
-      "is_active": true,
-      "date_joined": "2026-01-15T10:00:00Z"
-    }
-  ]
+  "results": [...]
 }
+```
+
+**Query Parameters:**
+- `page` — Page number (default: 1)
+- `page_size` — Items per page (default: 20, max: 100)
+
+**Example:**
+```
+GET /api/hris/employees/?page=2&page_size=50
 ```
 
 ---
 
-### GET `/api/account/session-tests/`
-**Auth:** Bearer Token
+## Rate Limiting
 
-**Response (200):**
-```json
-{
-  "user": "hassan",
-  "token_expires_at": "2026-02-17T11:00:00Z"
-}
+| Scope | Limit | Window |
+|-------|-------|--------|
+| Anonymous | 200 | per day |
+| Authenticated | 1000 | per day |
+| Login | 5 | per minute |
+| OTP Verify | 5 | per minute |
+| 2FA Verify | 5 | per minute |
+| OTP Send | 1 | per minute |
+| Token Refresh | 20 | per minute |
+| Password Forgot | 3 | per hour |
+| Password Change | 10 | per hour |
+
+**Rate Limit Headers:**
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1647360000
 ```
 
 ---
 
-# 5. Audit — `api/audit/`
+## Security Considerations
+
+1. **Always use HTTPS in production**
+2. **Never share your SECRET_KEY or database credentials**
+3. **Rotate API tokens regularly**
+4. **Implement proper CORS settings for your frontend domain**
+5. **Use the X-Tenant header to route requests to the correct tenant**
+6. **Enable 2FA for all admin accounts**
 
 ---
 
-### GET `/api/audit/notifications/`
-**Auth:** Bearer Token | **Query Params:** `?unread=true`
+## Support
 
-**Response (200):**
-```json
-{
-  "unread_count": 3,
-  "results": [
-    {
-      "id": 1,
-      "message": "Welcome! You have successfully registered.",
-      "read": false,
-      "created_at": "2026-01-15T10:00:00Z"
-    },
-    {
-      "id": 2,
-      "message": "Your company settings were updated.",
-      "read": true,
-      "created_at": "2026-02-10T08:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### POST `/api/audit/notifications/mark-read/` — Mark Single
-**Auth:** Bearer Token
-
-**Request:**
-```json
-{
-  "notification_id": 1
-}
-```
-
-**Response (200):**
-```json
-{
-  "detail": "Notification marked as read."
-}
-```
-
----
-
-### POST `/api/audit/notifications/mark-read/` — Mark All
-**Auth:** Bearer Token
-
-**Request:**
-```json
-{
-  "all": true
-}
-```
-
-**Response (200):**
-```json
-{
-  "detail": "Marked 3 notifications as read."
-}
-```
-
----
-
-### GET `/api/audit/activity-logs/`
-**Auth:** Bearer + Admin | **Query Params:** `?company=1`
-
-**Response (200):**
-```json
-{
-  "count": 10,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "user_display": "hassan",
-      "entity_type": "Company",
-      "action": "UPDATE",
-      "created_at": "2026-02-17T10:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### GET `/api/audit/activity-logs/my/`
-**Auth:** Bearer Token
-
-**Response (200):**
-```json
-{
-  "count": 5,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "user": 1,
-      "user_display": "hassan",
-      "company": 1,
-      "date": 20260217,
-      "entity_type": "Company",
-      "entity_id": 1,
-      "action": "UPDATE",
-      "old_values": { "name": "Old Name" },
-      "new_values": { "name": "New Name" },
-      "ip_address": "192.168.1.1",
-      "created_at": "2026-02-17T10:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### GET `/api/audit/security-logs/`
-**Auth:** Bearer Token
-
-**Response (200):**
-```json
-{
-  "count": 2,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "user": 1,
-      "user_display": "hassan",
-      "date": 20260217,
-      "action": "LOGIN_SUCCESS",
-      "metadata": {
-        "device": "Chrome on Windows",
-        "ip": "192.168.1.1"
-      },
-      "ip_address": "192.168.1.1",
-      "created_at": "2026-02-17T10:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-# Quick Reference
-
-| Module | Method | Endpoint | Auth |
-|--------|--------|----------|------|
-| Auth | POST | `/api/auth/signup/` | None |
-| Auth | POST | `/api/auth/verify-otp/` | None |
-| Auth | POST | `/api/auth/resent-otp/` | None |
-| Auth | POST | `/api/auth/finalize-signin/` | None |
-| Auth | POST | `/api/auth/login/` | None |
-| Auth | POST | `/api/auth/logout/` | Bearer |
-| Auth | POST | `/api/auth/token/refresh/` | None |
-| Auth | POST | `/api/auth/settings_enable-2fa/` | Bearer |
-| Auth | POST | `/api/auth/login-2fa-verify-code/` | None |
-| Auth | POST | `/api/auth/login-2fa-verify-backup/` | None |
-| Access | GET | `/api/access-control/permissions/` | Admin |
-| Access | POST | `/api/access-control/permissions/` | Admin |
-| Access | GET | `/api/access-control/permissions/{id}/` | Admin |
-| Access | PUT | `/api/access-control/permissions/{id}/` | Admin |
-| Access | PATCH | `/api/access-control/permissions/{id}/` | Admin |
-| Access | DELETE | `/api/access-control/permissions/{id}/` | Admin |
-| Access | GET | `/api/access-control/roles/` | Admin |
-| Access | POST | `/api/access-control/roles/` | Admin |
-| Access | GET | `/api/access-control/roles/{id}/` | Admin |
-| Access | PUT | `/api/access-control/roles/{id}/` | Admin |
-| Access | PATCH | `/api/access-control/roles/{id}/` | Admin |
-| Access | DELETE | `/api/access-control/roles/{id}/` | Admin |
-| Access | GET | `/api/access-control/role-permissions/` | Admin |
-| Access | POST | `/api/access-control/role-permissions/` | Admin |
-| Access | GET | `/api/access-control/role-permissions/{id}/` | Admin |
-| Access | DELETE | `/api/access-control/role-permissions/{id}/` | Admin |
-| Access | GET | `/api/access-control/user-companies/` | Admin |
-| Access | POST | `/api/access-control/user-companies/` | Admin |
-| Access | GET | `/api/access-control/user-companies/{id}/` | Admin |
-| Access | PUT | `/api/access-control/user-companies/{id}/` | Admin |
-| Access | DELETE | `/api/access-control/user-companies/{id}/` | Admin |
-| Access | GET | `/api/access-control/user-company-roles/` | Admin |
-| Access | POST | `/api/access-control/user-company-roles/` | Admin |
-| Access | GET | `/api/access-control/user-company-roles/{id}/` | Admin |
-| Access | DELETE | `/api/access-control/user-company-roles/{id}/` | Admin |
-| Access | GET | `/api/access-control/invitations/` | Admin |
-| Access | POST | `/api/access-control/invitations/` | Admin |
-| Access | GET | `/api/access-control/invitations/{id}/` | Admin |
-| Access | PUT | `/api/access-control/invitations/{id}/` | Admin |
-| Access | DELETE | `/api/access-control/invitations/{id}/` | Admin |
-| Access | POST | `/api/access-control/invitations/accept/` | Bearer |
-| Access | POST | `/api/access-control/invitations/{id}/revoke/` | Admin |
-| Access | POST | `/api/access-control/invitations/{id}/resend/` | Admin |
-| Company | GET | `/api/company/` | Bearer |
-| Company | POST | `/api/company/` | Bearer |
-| Company | GET | `/api/company/{id}/` | Bearer |
-| Company | PUT | `/api/company/{id}/` | Admin/Owner |
-| Company | PATCH | `/api/company/{id}/` | Admin/Owner |
-| Company | DELETE | `/api/company/{id}/` | Owner |
-| Company | GET | `/api/company/{id}/settings/` | Bearer |
-| Company | PUT | `/api/company/{id}/settings/` | Admin/Owner |
-| Company | PATCH | `/api/company/{id}/settings/` | Admin/Owner |
-| Account | GET | `/api/account/profile/` | Bearer |
-| Account | PUT | `/api/account/profile/` | Bearer |
-| Account | PATCH | `/api/account/profile/` | Bearer |
-| Account | GET | `/api/account/users/` | Admin |
-| Account | GET | `/api/account/session-tests/` | Bearer |
-| Audit | GET | `/api/audit/notifications/` | Bearer |
-| Audit | POST | `/api/audit/notifications/mark-read/` | Bearer |
-| Audit | GET | `/api/audit/activity-logs/` | Admin |
-| Audit | GET | `/api/audit/activity-logs/my/` | Bearer |
-| Audit | GET | `/api/audit/security-logs/` | Bearer |
-
----
-
-## Rate Limits
-
-| Scope | Limit |
-|-------|-------|
-| Anonymous | 200/day |
-| Authenticated | 1000/day |
-| Signup | 3/hour |
-| Finalize Signin | 3/hour |
-| Login | 5/min |
-| OTP Resend | 3/hour |
-| OTP Verify | 5/min |
-| 2FA Verify | 5/min |
-| Token Refresh | 20/min |
-| Enable 2FA | 10/hour |
-
----
-
-## Interactive Docs
-
-| Tool | URL |
-|------|-----|
-| Swagger UI | `/swagger/` |
-| ReDoc | `/redoc/` |
-| OpenAPI JSON | `/swagger.json` |
-| OpenAPI YAML | `/swagger.yaml` |
+For API support:
+- **Swagger UI**: `/swagger/`
+- **ReDoc**: `/redoc/`
+- **GitHub Issues**: [Report issues](https://github.com/EngHassanAshraf/ouvira-backend/issues)
