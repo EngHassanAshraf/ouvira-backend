@@ -56,7 +56,7 @@ class ApplicationService:
             entity_type="JobApplication",
             entity_id=application.id,
             action="APPLIED",
-            new_values=candidate_data
+            new_values={k: str(v) if hasattr(v, 'id') else v for k, v in candidate_data.items()} if candidate_data else {}
         )
 
         return application

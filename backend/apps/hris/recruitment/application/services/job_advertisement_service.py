@@ -75,7 +75,7 @@ class JobAdvertisementService:
             entity_type="JobAdvertisement",
             entity_id=ad.id,
             action="PUBLISHED",
-            new_values=data
+            new_values={k: str(v) if hasattr(v, 'id') else v for k, v in data.items()} if data else {}
         )
 
         return ad
