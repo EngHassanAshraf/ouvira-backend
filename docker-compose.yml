@@ -10,6 +10,8 @@ services:
     command: python manage.py runserver 0.0.0.0:8000
     user: "${UID:-1000}:${GID:-1000}"
     environment:
+      DJANGO_SETTINGS_MODULE: config.settings.local
+      DEBUG: "True"
       RUN_MIGRATIONS: "true"
       GEOIP_PATH: "/var/opt/geoip/GeoLite2-City.mmdb"
     env_file:

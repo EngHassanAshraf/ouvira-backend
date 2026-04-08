@@ -34,7 +34,7 @@ class EmployeeListSerializer(serializers.ModelSerializer):
     UZB: Xodimlarni ro'yhattan o'tkazish faqat asosiy maydonlar
     ENG: for listing employee with basic information
     """
-    full_name = serializers.SerializerMethodField
+    full_name = serializers.SerializerMethodField()
     department = DepartmentSerializer(read_only=True)
     location_name = serializers.CharField(source='location.name', read_only=True)
 

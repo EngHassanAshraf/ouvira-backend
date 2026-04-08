@@ -10,7 +10,7 @@ class EmployeeSelector:
         return Employee.objects.filter(
            company_id=company_id,
             is_deleted=False
-        ).select_related('location', 'user')# locationni ham qo'shib olinadi Performans uchun
+        ).select_related('location') # locationni ham qo'shib olinadi Performans uchun
 
     @staticmethod
     def get_employee_detail(employee_id: int, company_id: int)-> Employee:
