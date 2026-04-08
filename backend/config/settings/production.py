@@ -17,11 +17,11 @@ if SECRET_KEY and "django-insecure" in SECRET_KEY:
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
 # CORS — whitelist only trusted origins
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "False") == "True"
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
-    if origin.strip()
+    if origin.strip() and origin.strip() != "*" and "://" in origin.strip()
 ]
 CORS_ALLOW_HEADERS = [
     *default_headers,
@@ -30,10 +30,11 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # CSRF — trust your frontend domains
+# Values must start with a scheme (https:// or http://) per Django 4.0+
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
-    if origin.strip()
+    if origin.strip() and origin.strip() != "*" and "://" in origin.strip()
 ]
 
 DATABASES = {

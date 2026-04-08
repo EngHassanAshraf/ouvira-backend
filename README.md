@@ -1,249 +1,482 @@
-# Ouvira — Multi-Tenant Backend API
+# Ouvira — Multi-Tenant Enterprise Backend API
 
-A multi-tenant Django backend providing authentication, RBAC, company management, and audit logging. Built with Django REST Framework and designed for secure, scalable enterprise applications.
+A comprehensive multi-tenant Django backend providing authentication, RBAC, company management, HRIS (Human Resources Information System), recruitment, and audit logging. Built with Django REST Framework and designed for secure, scalable enterprise applications.
 
-## Tech Stack
+## 🎯 Project Overview
+
+Ouvira is an enterprise-grade backend system that enables organizations to:
+- Manage multi-tenant SaaS deployments with schema isolation
+- Handle secure user authentication with JWT, OTP, and 2FA
+- Implement fine-grained role-based access control (RBAC)
+- Manage companies, employees, departments, and positions
+- Run complete recruitment workflows (hiring, candidates, interviews, job offers)
+- Track attendance and employee records
+- Maintain comprehensive audit logs for compliance
+
+**Target Users:** Enterprise organizations requiring a scalable, secure, multi-tenant backend with HR capabilities.
+
+---
+
+## 🛠 Tech Stack
 
 | Component | Technology |
-|-----------|-----------|
-| Framework | Django 5.2.9 + DRF 3.16.1 |
-| Auth | JWT (simplejwt) + OTP (pyotp) + 2FA |
-| Database | PostgreSQL 15 |
-| Cache | Redis |
-| Multi-tenancy | django-tenants (schema isolation) |
-| API Docs | Swagger / ReDoc (drf-yasg) |
-| Container | Docker & Docker Compose |
-| Python | 3.10 |
-| Integrations | Twilio SMS, Cloudflare Turnstile |
+|-----------|------------|
+| **Framework** | Django 5.2.9 + DRF 3.16.1 |
+| **Auth** | JWT (simplejwt) + OTP (pyotp) + 2FA (TOTP) |
+| **Database** | PostgreSQL 15 |
+| **Cache/Broker** | Redis (caching + Celery broker) |
+| **Multi-tenancy** | django-tenants (schema isolation) |
+| **API Docs** | Swagger / ReDoc (drf-yasg) |
+| **Container** | Docker & Docker Compose |
+| **Python** | 3.10 |
+| **Task Queue** | Celery + Celery Beat |
+| **CI/CD** | GitHub Actions |
+| **Integrations** | Twilio SMS, Vonage, Resend Email, Cloudflare Turnstile |
 
-## Architecture
+---
+
+## 🏗 Architecture Overview
+
+### High-Level Architecture
 
 ```
-backend/
-├── config/                         # Configuration
-│   ├── settings/
-│   │   ├── base.py                # Shared settings
-│   │   ├── local.py               # Dev (DEBUG, CORS open)
-│   │   └── production.py          # Prod (SSL, HSTS, CORS whitelist)
-│   ├── urls.py                    # Root URL routing
-│   ├── asgi.py / wsgi.py          # Entry points (DJANGO_ENV-based)
+┌─────────────────────────────────────────────────────────────────┐
+│                         Client Layer                             │
+│                    (Web/Mobile Applications)                     │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                      API Gateway                                 │
+│              (CORS, CSRF, Rate Limiting)                         │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                    Tenant Middleware                             │
+│            (Schema routing based on X-Tenant header)             │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                     View Layer                                   │
+│         (ViewSet, Serializers, Permissions, Throttling)          │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                    Service Layer                                 │
+│              (Business Logic, External APIs)                     │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                     Model Layer                                  │
+│         (Django ORM, Soft Delete, Audit Tracking)                │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                    Database Layer                                │
+│    PostgreSQL (Shared Schema + Tenant Schemas) + Redis Cache     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Module Breakdown
+
+```
+backend/apps/
+├── identity/
+│   ├── account/           # User model, profile, user listing
+│   └── auth_app/          # Signup, login, OTP, 2FA, tokens, password management
 │
-├── apps/
-│   ├── access_control/            # RBAC: roles, permissions, invitations
-│   │   ├── models/                # Permission, Role, RolePermission, UserCompany, etc.
-│   │   ├── services/              # Service layer (business logic)
-│   │   ├── api/                   # Serializers, views, URLs
-│   │   └── permissions.py
-│   │
-│   ├── audit/                     # Activity logs, security logs, notifications
-│   │   ├── models/
-│   │   ├── services/              # NotificationService, ActivityLogService, SecurityAuditLogService
-│   │   ├── api/
-│   │   └── signals.py
-│   │
-│   ├── company/                   # Company CRUD, settings, hierarchy
-│   │   ├── models/
-│   │   ├── services/              # CompanyService, CompanySettingsService
-│   │   ├── api/
-│   │   └── permissions.py         # IsCompanyOwner, IsCompanyAdmin
-│   │
-│   ├── identity/
-│   │   ├── account/               # User model, profile, user listing
-│   │   │   ├── models/
-│   │   │   ├── services/          # AccountService
-│   │   │   └── api/
-│   │   └── auth_app/              # Signup, login, OTP, 2FA, tokens
-│   │       ├── services/          # AuthService, OTPService, TwoFAService, TokenService
-│   │       └── api/
-│   │
-│   ├── tenant/                    # Multi-tenancy middleware & models
-│   ├── core/                      # Base models, utilities
-│   └── shared/                    # Shared exceptions, messages
+├── access_control/
+│   ├── models/            # Permission, Role, RolePermission, UserCompany, Invitation
+│   ├── services/          # RBAC business logic
+│   └── api/               # CRUD endpoints for access control
 │
-├── manage.py                      # DJANGO_ENV-based settings selection
-└── requirements.txt
+├── company/
+│   ├── models/            # Company, CompanySettings
+│   ├── services/          # Company management logic
+│   └── api/               # Company CRUD endpoints
+│
+├── hris/
+│   ├── hris_core/         # Employee, Department, Position, Location, Organization
+│   ├── leave_management/  # Leave requests and approvals
+│   ├── recruitment/       # Hiring requests, candidates, job applications, interviews
+│   ├── travel_management/ # Travel requests and approvals
+│   ├── expense_management/# Expense tracking and approvals
+│   ├── performance/       # Performance reviews and goals
+│   ├── termination/       # Employee offboarding
+│   └── analytics/         # HR analytics and reporting
+│
+├── audit/
+│   ├── models/            # ActivityLog, SecurityAuditLog, Notification
+│   ├── services/          # Logging and notification services
+│   └── api/               # Audit log and notification endpoints
+│
+├── tenant/
+│   ├── models/            # Tenant, Domain
+│   └── middleware/        # Tenant routing middleware
+│
+├── core/                  # Base models, utilities
+├── shared/                # Shared exceptions, messages
+└── notifications/         # Notification preferences
 ```
 
-### Layered Architecture
+### Layered Architecture Pattern
+
+Each module follows a consistent layered pattern:
 
 ```
-Request → Middleware (Tenant) → View → Service Layer → Model
-                                  ↓
-                             Serializer (validation)
-                                  ↓
-                             Permission (RBAC)
+Request → Middleware (Tenant) → View → Serializer → Permission → Service → Model
 ```
 
-Each app follows: **Models → Services → Serializers → Views → URLs**
+**Layer Responsibilities:**
+- **Models**: Data structure, relationships, soft delete
+- **Services**: Business logic, external API calls, complex operations
+- **Serializers**: Input validation, output formatting
+- **Views**: HTTP handling, response formatting
+- **Permissions**: Access control (RBAC)
+- **Middleware**: Tenant routing, CORS, security
 
-## Setup & Installation
+---
+
+## ✨ Features
+
+### Authentication & Security
+- JWT-based authentication with access/refresh tokens
+- OTP verification (email/SMS)
+- Two-factor authentication (TOTP with backup codes)
+- Password reset via email
+- Session management and token blacklisting
+- Cloudflare Turnstile integration
+
+### Multi-Tenancy
+- Schema-based tenant isolation
+- Automatic tenant routing via X-Tenant header
+- Shared and tenant-specific tables
+- Tenant-aware queries
+
+### Access Control (RBAC)
+- Custom permissions per module
+- Role-based access control
+- User-company associations
+- Invitation system with expiry
+
+### Company Management
+- Company CRUD operations
+- Company settings configuration
+- Hierarchy management
+
+### HRIS (Human Resources)
+- **Employee Management**: Full employee profiles with personal and professional details
+- **Department Management**: Hierarchical department structure
+- **Position Management**: Job positions with reporting structure
+- **Location Management**: Office locations and addresses
+- **Attendance Tracking**: Clock-in/clock-out records
+
+### Recruitment
+- **Hiring Requests**: Manager approval workflow
+- **Candidate Management**: Candidate profiles and tracking
+- **Job Applications**: Application processing
+- **Interviews**: Interview scheduling and feedback
+- **Job Offers**: Offer generation and onboarding
+
+### Audit & Compliance
+- Activity logging for all operations
+- Security audit logs
+- Notification system
+- Compliance tracking
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
+
 - Docker & Docker Compose
 - Python 3.10+ (for local dev without Docker)
+- PostgreSQL 15 (for local dev without Docker)
+- Redis (for local dev without Docker)
 
-### 1. Environment
+### 1. Environment Setup
 
 ```bash
+# Clone the repository
+git clone https://github.com/EngHassanAshraf/ouvira-backend.git
+cd ouvira-backend
+
+# Copy environment file
 cp .env.example .env
+
 # Edit .env with your values
 ```
 
-Key variables:
+### 2. Environment Variables
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `DJANGO_ENV` | Settings module (`local` or `production`) | `local` |
-| `SECRET_KEY` | Django secret key | **Required** |
-| `DEBUG` | Debug mode | `False` |
-| `ALLOWED_HOSTS` | Comma-separated hosts | `localhost` |
-| `TENANT_BASE_DOMAIN` | Base domain for tenant routing | `localhost` |
-| `POSTGRES_DB` | Database name | `ouvira_db` |
-| `CORS_ALLOWED_ORIGINS` | Production CORS whitelist | — |
-| `CSRF_TRUSTED_ORIGINS` | Production CSRF origins | — |
+| Variable | Purpose | Default | Required |
+|----------|---------|---------|----------|
+| `DJANGO_ENV` | Settings module (`local` or `production`) | `local` | No |
+| `SECRET_KEY` | Django secret key | — | **Yes** |
+| `DEBUG` | Debug mode | `False` | No |
+| `ALLOWED_HOSTS` | Comma-separated hosts | `localhost` | No |
+| `TENANT_BASE_DOMAIN` | Base domain for tenant routing | `localhost` | No |
+| `POSTGRES_DB` | Database name | `ouvira_db` | No |
+| `POSTGRES_USER` | Database user | `admin_user` | No |
+| `POSTGRES_PASSWORD` | Database password | — | **Yes** |
+| `DB_HOST` | Database host | `db` | No |
+| `DB_PORT` | Database port | `5432` | No |
+| `CORS_ALLOWED_ORIGINS` | Production CORS whitelist | — | No |
+| `CSRF_TRUSTED_ORIGINS` | Production CSRF origins | — | No |
 
-### 2. Docker (Recommended)
+### 3. Docker (Recommended)
 
 ```bash
+# Build and start services
 docker compose up --build -d
+
+# Create superuser
 docker compose exec backend python manage.py createsuperuser
+
+# View logs
+docker compose logs -f backend
 ```
 
-Services:
+**Services Available:**
 - **Backend API**: `http://localhost:8000`
 - **Swagger UI**: `http://localhost:8000/swagger/`
 - **ReDoc**: `http://localhost:8000/redoc/`
 - **Admin**: `http://localhost:8000/admin/`
+- **PostgreSQL**: `localhost:5432`
+- **Redis**: `localhost:6379`
 
-### 3. Local (Without Docker)
+### 4. Local Development (Without Docker)
 
 ```bash
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
-cd backend
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Run migrations
+cd backend
 python manage.py migrate
+
+# Create superuser
+python manage.py createsuperuser
+
+# Start development server
 python manage.py runserver
 ```
 
-## API Endpoints
+---
 
-All authenticated endpoints require `Authorization: Bearer <token>` and `X-Tenant: <subdomain>` headers.
+## 📁 Project Structure
 
-### Authentication — `api/auth/`
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/api/auth/signup/` | None | Start signup (sends OTP) |
-| POST | `/api/auth/resent-otp/` | None | Resend OTP |
-| POST | `/api/auth/finalize-signin/` | None | Complete signup (email + password) |
-| POST | `/api/auth/login/` | None | Login (email or phone) |
-| POST | `/api/auth/logout/` | Bearer | Logout (blacklist token) |
-| POST | `/api/auth/token/refresh/` | None | Refresh access token |
-| POST | `/api/auth/settings_enable-2fa/` | Bearer | Enable 2FA (TOTP) |
-| POST | `/api/auth/login-2fa-verify-code/` | None | Verify 2FA code |
-| POST | `/api/auth/login-2fa-verify-backup/` | None | Verify 2FA backup code |
-| POST | `/api/auth/otp/send/` | None | Send OTP (email/SMS) |
-| POST | `/api/auth/otp/verify/` | None | Verify OTP |
-| POST | `/api/auth/password/forgot/` | None | Send password reset link |
-| GET | `/api/auth/password/validate-reset-token/` | None | Validate reset token |
-| POST | `/api/auth/password/reset/` | None | Reset password with token |
-| POST | `/api/auth/password/change/` | Bearer | Change password (known password) |
-
-### Access Control — `api/access-control/`
-
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| GET, POST | `/api/access-control/permissions/` | Admin |
-| GET, PUT, PATCH, DELETE | `/api/access-control/permissions/{id}/` | Admin |
-| GET, POST | `/api/access-control/roles/` | Admin |
-| GET, PUT, PATCH, DELETE | `/api/access-control/roles/{id}/` | Admin |
-| GET, POST | `/api/access-control/role-permissions/` | Admin |
-| GET, DELETE | `/api/access-control/role-permissions/{id}/` | Admin |
-| GET, POST | `/api/access-control/user-companies/` | Admin |
-| GET, PUT, DELETE | `/api/access-control/user-companies/{id}/` | Admin |
-| GET, POST | `/api/access-control/user-company-roles/` | Admin |
-| GET, DELETE | `/api/access-control/user-company-roles/{id}/` | Admin |
-| GET, POST | `/api/access-control/invitations/` | Admin |
-| GET, PUT, DELETE | `/api/access-control/invitations/{id}/` | Admin |
-| POST | `/api/access-control/invitations/accept/` | Bearer |
-| POST | `/api/access-control/invitations/{id}/revoke/` | Admin |
-| POST | `/api/access-control/invitations/{id}/resend/` | Admin |
-
-### Company — `api/company/`
-
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| GET, POST | `/api/company/` | Bearer |
-| GET, PUT, PATCH | `/api/company/{id}/` | Bearer / Admin |
-| DELETE | `/api/company/{id}/` | Owner |
-| GET, PUT, PATCH | `/api/company/{id}/settings/` | Bearer / Admin |
-
-### Account — `api/account/`
-
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| GET, PUT, PATCH | `/api/account/profile/` | Bearer |
-| GET | `/api/account/users/` | Admin |
-| GET | `/api/account/session-tests/` | Bearer / Admin |
-
-### Audit — `api/audit/`
-
-| Method | Endpoint | Auth |
-|--------|----------|------|
-| GET | `/api/audit/notifications/` | Bearer |
-| POST | `/api/audit/notifications/mark-read/` | Bearer |
-| GET | `/api/audit/activity-logs/` | Admin |
-| GET | `/api/audit/activity-logs/my/` | Bearer |
-| GET | `/api/audit/security-logs/` | Bearer |
-
-### Rate Limits
-
-| Scope | Limit |
-|-------|-------|
-| Anonymous | 200/day |
-| Authenticated | 1000/day |
-| Login | 5/min |
-| OTP Verify & 2FA | 5/min |
-| OTP Send | 1/min |
-| Token Refresh | 20/min |
-| Password Forgot | 3/hour |
-| Password Change | 10/hour |
-
-## Settings Modes
-
-| Setting | Local (`DJANGO_ENV=local`) | Production (`DJANGO_ENV=production`) |
-|---------|---------------------------|--------------------------------------|
-| `DEBUG` | `True` | `False` |
-| `ALLOWED_HOSTS` | `["*"]` | From env var |
-| `CORS` | Allow all origins | Whitelist only |
-| `SSL` | Off | Enforced (HSTS 1yr) |
-| `SECRET_KEY` | Any | Validated (rejects insecure) |
-| `Email` | Console backend | Production backend |
-
-## Useful Commands
-
-```bash
-# Logs
-docker compose logs -f backend
-
-# Django shell
-docker compose exec backend python manage.py shell
-
-# System check
-docker compose exec backend python manage.py check
-
-# Stop services
-docker compose down
-
-# Reset (delete all data)
-docker compose down -v
+```
+ouvira-backend/
+├── backend/
+│   ├── config/                     # Django configuration
+│   │   ├── settings/
+│   │   │   ├── base.py            # Shared settings
+│   │   │   ├── local.py           # Development settings
+│   │   │   └── production.py      # Production settings
+│   │   ├── urls.py                # Root URL routing
+│   │   ├── wsgi.py                # WSGI entry point
+│   │   ├── asgi.py                # ASGI entry point
+│   │   ├── celery.py              # Celery configuration
+│   │   └── middleware.py          # Custom middleware
+│   │
+│   ├── apps/                       # Application modules
+│   │   ├── identity/              # Authentication & accounts
+│   │   ├── access_control/        # RBAC
+│   │   ├── company/               # Company management
+│   │   ├── hris/                  # HRIS modules
+│   │   ├── audit/                 # Audit logging
+│   │   ├── tenant/                # Multi-tenancy
+│   │   ├── core/                  # Base utilities
+│   │   └── shared/                # Shared components
+│   │
+│   ├── manage.py                  # Django management
+│   ├── gunicorn.conf.py           # Gunicorn configuration
+│   └── requirements.txt           # Python dependencies
+│
+├── docker/
+│   ├── Dockerfile                 # Multi-stage Docker build
+│   └── entrypoint.sh              # Container entrypoint
+│
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                 # CI pipeline (lint, test, security)
+│       └── deploy.yml             # CD pipeline (staging, production)
+│
+├── docker-compose.yml             # Local development compose
+├── railway.toml                   # Railway deployment config
+├── .env.example                   # Environment template
+└── README.md                      # This file
 ```
 
-## Contributing
+---
 
-1. Create feature branch: `git checkout -b feature/feature-name`
-2. Follow the layered architecture: Models → Services → Serializers → Views → URLs
-3. Add audit logging for sensitive operations
-4. Include migrations for model changes
-5. Update API documentation
+## 🔧 Development Workflow
+
+### Branching Strategy
+
+```
+main (production)
+  └── develop (staging)
+        └── feature/* (feature branches)
+        └── hotfix/* (urgent fixes)
+        └── release/* (release preparation)
+```
+
+### Creating a Feature Branch
+
+```bash
+# Create feature branch
+git checkout -b feature/feature-name
+
+# Make changes and commit
+git add .
+git commit -m "feat: description of changes"
+
+# Push to remote
+git push origin feature/feature-name
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+cd backend
+pytest
+
+# Run with coverage
+pytest --cov=. --cov-report=html
+
+# Run specific test file
+pytest apps/identity/tests/test_auth.py
+```
+
+### Code Quality
+
+```bash
+# Run linting
+flake8 backend/
+
+# Check formatting
+black --check backend/
+
+# Check imports
+isort --check-only backend/
+```
+
+### Making Migrations
+
+```bash
+# Create migrations after model changes
+python manage.py makemigrations
+
+# Review migration file
+# Then commit the migration file
+
+# Apply migrations
+python manage.py migrate
+```
+
+---
+
+## 🚀 Deployment
+
+### CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration and deployment:
+
+**CI Pipeline (on push/PR):**
+- Linting (flake8, black, isort)
+- Testing (pytest with coverage)
+- Docker build validation
+- Security scanning (safety, bandit)
+
+**CD Pipeline (on merge to main/develop):**
+- Build and push Docker image
+- Deploy to staging (develop) or production (main)
+- Run migrations
+- Health checks
+
+### Environments
+
+| Environment | Branch | URL | Auto-deploy |
+|-------------|--------|-----|-------------|
+| Development | feature/* | Local | Manual |
+| Staging | develop | staging.ouvira.com | Yes |
+| Production | main | ouvira.com | After staging validation |
+
+### Deployment Commands
+
+```bash
+# Build Docker image
+docker build -f docker/Dockerfile -t ouvira-backend:latest .
+
+# Run production container
+docker run -d \
+  -e DJANGO_ENV=production \
+  -e SECRET_KEY=your-secret-key \
+  -p 8000:8000 \
+  ouvira-backend:latest
+```
+
+---
+
+## 📝 Contributing
+
+1. **Create a feature branch:**
+   ```bash
+   git checkout -b feature/feature-name
+   ```
+
+2. **Follow the layered architecture:**
+   - Models → Services → Serializers → Views → URLs
+
+3. **Add tests for new functionality:**
+   ```bash
+   pytest apps/your_module/tests/
+   ```
+
+4. **Include migrations for model changes:**
+   ```bash
+   python manage.py makemigrations
+   ```
+
+5. **Add audit logging for sensitive operations:**
+   ```python
+   from apps.audit.services import ActivityLogService
+   ActivityLogService.log_action(user, "action_type", details)
+   ```
+
+6. **Update API documentation** if endpoints change
+
+7. **Create a pull request** with:
+   - Clear description of changes
+   - Test results
+   - Screenshots (if UI changes)
+
+### Code Standards
+
+- Follow PEP 8 style guide
+- Use type hints where appropriate
+- Write docstrings for public methods
+- Keep functions small and focused
+- Use service layer for business logic
+
+---
+
+## 📄 License
+
+Proprietary - All rights reserved.
+
+---
+
+## 📞 Support
+
+For questions or issues:
+- **Documentation**: `/swagger/` or `/redoc/`
+- **Admin Panel**: `/admin/`
+- **GitHub Issues**: [Report issues](https://github.com/EngHassanAshraf/ouvira-backend/issues)

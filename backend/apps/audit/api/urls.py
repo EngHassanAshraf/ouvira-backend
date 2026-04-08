@@ -8,15 +8,17 @@ from .views import (
     SecurityAuditLogListView,
 )
 
+app_name = "audit"
+
 urlpatterns = [
-    # Notification endpoints
+    # --- Notifications ---
     path("notifications/", NotificationListView.as_view(), name="notification-list"),
     path("notifications/mark-read/", NotificationMarkReadView.as_view(), name="notification-mark-read"),
 
-    # Activity log endpoints
+    # --- Activity logs ---
     path("activity-logs/", ActivityLogListView.as_view(), name="activity-log-list"),
     path("activity-logs/my/", ActivityLogDetailView.as_view(), name="activity-log-my"),
 
-    # Security audit log endpoints
+    # --- Security audit logs ---
     path("security-logs/", SecurityAuditLogListView.as_view(), name="security-log-list"),
 ]

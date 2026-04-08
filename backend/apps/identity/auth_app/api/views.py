@@ -237,19 +237,18 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data, context={"request": request})
 
         if not serializer.is_valid():
-            if not serializer.data.get("cf_turnstile_response"):
-                return Response(
-                    {
-                        "status": "error",
-                        "message": "Invalid Turnstile token"
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
             error_message = ERROR_MESSAGES["LOGIN_CREDENTIALS_INCORRECT"]
-            non_field_errors = serializer.errors.get("non_field_errors")
-            if non_field_errors:
-                error_message = non_field_errors[0]
-                
+            # Check for specific serializer errors (like Turnstile or Lockout)
+            if "cf_turnstile_response" in serializer.errors:
+                error_message = serializer.errors["cf_turnstile_response"][0]
+            elif "non_field_errors" in serializer.errors:
+                error_message = serializer.errors["non_field_errors"][0]
+            elif any(serializer.errors.values()):
+                # Fallback to the first available error message
+                first_error = next(iter(serializer.errors.values()))
+                if isinstance(first_error, list):
+                    error_message = first_error[0]
+
             return Response(
                 {"status": "error", "message": str(error_message)},
                 status=status.HTTP_400_BAD_REQUEST,

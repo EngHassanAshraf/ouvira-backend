@@ -1,6 +1,8 @@
 from django.contrib import admin
 from .models.base import Location
 from .models.employee import Employee
+from .models.organization import Department, JobTitle, Position
+from .models.attendance import AttendanceRecord
 
 @admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):
@@ -41,7 +43,7 @@ class EmployeeAdmin(admin.ModelAdmin):
     # Saudiya talablari bo'lgani uchun IQAMA (national_id) ni alohida guruhlab ko'rsatsa ham bo'ladi
     fieldsets = (
         ('Personal Info', {
-            'fields': ('user', 'company', 'location', 'first_name', 'last_name', 'employee_id')
+            'fields': ('user_id', 'company', 'location', 'first_name', 'last_name', 'employee_id')
         }),
         ('Identification (KSA)', {
             'fields': ('national_id', 'passport_number', 'nationality')
@@ -50,3 +52,32 @@ class EmployeeAdmin(admin.ModelAdmin):
             'fields': ('date_of_birth', 'gender', 'marital_status', 'contact_number', 'personal_email')
         }),
     )
+
+
+@admin.register(Department)
+class DepartmentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'company', 'parent_department')
+    list_filter = ('company',)
+    search_fields = ('name',)
+
+
+@admin.register(JobTitle)
+class JobTitleAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'company')
+    list_filter = ('company',)
+    search_fields = ('title',)
+
+
+@admin.register(Position)
+class PositionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'job_title', 'department', 'location', 'is_active')
+    list_filter = ('company', 'department', 'is_active')
+    search_fields = ('job_title__title', 'department__name')
+
+
+@admin.register(AttendanceRecord)
+class AttendanceRecordAdmin(admin.ModelAdmin):
+    list_display = ('employee', 'date', 'check_in_time', 'check_out_time', 'status')
+    list_filter = ('date', 'status', 'employee__company')
+    search_fields = ('employee__first_name', 'employee__last_name', 'employee__employee_id')
+    date_hierarchy = 'date'

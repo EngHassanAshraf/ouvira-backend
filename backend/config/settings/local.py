@@ -1,7 +1,8 @@
 """
 Local development settings.
 """
-from .base import * 
+
+from .base import *
 
 ALLOWED_HOSTS = ["*"]
 

@@ -27,6 +27,17 @@ class ActivityLogService:
         ).select_related("company", "date").order_by("-created_at")
 
     @staticmethod
+    def _sanitize_data(data):
+        """Recursively convert model instances to IDs for JSON serialization."""
+        if isinstance(data, dict):
+            return {k: ActivityLogService._sanitize_data(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [ActivityLogService._sanitize_data(v) for v in data]
+        elif hasattr(data, "pk"):
+            return data.pk
+        return data
+
+    @staticmethod
     def log_activity(
         user,
         company,
@@ -39,6 +50,10 @@ class ActivityLogService:
         ip_address: str = None,
     ) -> ActivityLog:
         """Log an activity."""
+        # Sanitize values to ensure they are JSON serializable
+        safe_old = ActivityLogService._sanitize_data(old_values)
+        safe_new = ActivityLogService._sanitize_data(new_values)
+
         log = ActivityLog.objects.create(
             user=user,
             company=company,
@@ -46,8 +61,8 @@ class ActivityLogService:
             entity_type=entity_type,
             entity_id=entity_id,
             action=action,
-            old_values=old_values,
-            new_values=new_values,
+            old_values=safe_old,
+            new_values=safe_new,
             ip_address=ip_address,
         )
         logger.info(f"Activity logged: {action} by {user} on {entity_type}:{entity_id}")

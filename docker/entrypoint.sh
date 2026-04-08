@@ -6,6 +6,9 @@ echo "Environment: ${DJANGO_ENV:-production}"
 echo "Run Migrations: ${RUN_MIGRATIONS:-false}"
 echo ""
 
+# Set Django settings module if not already set
+export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-config.settings.production}
+
 # Function to log with timestamp
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
@@ -15,8 +18,17 @@ log() {
 check_db() {
     log "Checking database connectivity..."
     python -c "
+import os
 import sys
 import time
+
+# Set Django settings module
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', '${DJANGO_SETTINGS_MODULE}')
+
+# Setup Django
+import django
+django.setup()
+
 from django.db import connections
 from django.db.utils import OperationalError
 
@@ -61,7 +73,7 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     # Check database connectivity first
     check_db
     
-    # Run migrations with explicit settings
+    # Run migrations
     python manage.py migrate --noinput
     
     # Validate migrations completed successfully

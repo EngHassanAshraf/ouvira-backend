@@ -43,7 +43,13 @@ class HiringRequestService:
             entity_type="HiringRequest",
             entity_id=hiring_request.id,
             action="CREATED",
-            new_values=data
+            new_values={
+                "job_title_id": hiring_request.job_title_id,
+                "department_id": hiring_request.department_id,
+                "vacancies": hiring_request.vacancies,
+                "purpose": hiring_request.purpose,
+                "status": hiring_request.status
+            }
         )
 
         return hiring_request
