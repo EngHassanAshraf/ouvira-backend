@@ -1,0 +1,447 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-4a5b-6c7d-8e9f0a1b2c3d",
+		"name": "Recruitment Management System - E2E Lifecycle",
+		"description": "Comprehensive E2E lifecycle for Ouvira Recruitment module including HR bridge verification.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Login Successful\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set(\"access_token\", jsonData.access);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"identifier\": \"{{username}}\",\n    \"password\": \"{{password}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Discovery",
+			"item": [
+				{
+					"name": "List Companies",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"var company = jsonData.results ? jsonData.results.find(c => c.name === \"Shawahid Test Co\") : jsonData.find(c => c.name === \"Shawahid Test Co\");",
+									"if (company) pm.environment.set(\"company_id\", company.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"url": { "raw": "{{base_url}}/api/company/", "host": ["{{base_url}}"], "path": ["api", "company", ""] }
+					}
+				},
+				{
+					"name": "List Departments",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"var dept = jsonData.results ? jsonData.results.find(d => d.name === \"Engineering\") : jsonData.find(d => d.name === \"Engineering\");",
+									"if (dept) pm.environment.set(\"dept_id\", dept.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"url": { "raw": "{{base_url}}/api/hris/core/departments/", "host": ["{{base_url}}"], "path": ["api", "hris", "core", "departments", ""] }
+					}
+				},
+				{
+					"name": "List Job Titles",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"var title = jsonData.results ? jsonData.results.find(t => t.title === \"Software Engineer\") : jsonData.find(t => t.title === \"Software Engineer\");",
+									"if (title) pm.environment.set(\"job_title_id\", title.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"url": { "raw": "{{base_url}}/api/hris/core/job-titles/", "host": ["{{base_url}}"], "path": ["api", "hris", "core", "job-titles", ""] }
+					}
+				}
+			]
+		},
+		{
+			"name": "Recruitment Lifecycle",
+			"item": [
+				{
+					"name": "Create Hiring Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Request Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    pm.environment.set(\"hiring_request_id\", pm.response.json().id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"company\": {{company_id}},\n    \"job_title\": {{job_title_id}},\n    \"department\": {{dept_id}},\n    \"vacancies\": 1,\n    \"purpose\": \"Verification via Postman\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/hiring-requests/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "hiring-requests", ""] }
+					}
+				},
+				{
+					"name": "Submit Hiring Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/hiring-requests/{{hiring_request_id}}/submit/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "hiring-requests", "{{hiring_request_id}}", "submit", ""] }
+					}
+				},
+				{
+					"name": "Approve (Employee)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"role_type\": \"employee\", \"note\": \"Approved in Postman\"}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/hiring-requests/{{hiring_request_id}}/approve/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "hiring-requests", "{{hiring_request_id}}", "approve", ""] }
+					}
+				},
+				{
+					"name": "Approve (HR)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"role_type\": \"hr_employee\", \"note\": \"Approved in Postman\"}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/hiring-requests/{{hiring_request_id}}/approve/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "hiring-requests", "{{hiring_request_id}}", "approve", ""] }
+					}
+				},
+				{
+					"name": "Approve (Manager)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"role_type\": \"direct_manager\", \"note\": \"Approved in Postman\"}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/hiring-requests/{{hiring_request_id}}/approve/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "hiring-requests", "{{hiring_request_id}}", "approve", ""] }
+					}
+				},
+				{
+					"name": "Find Auto-created Ad",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"var results = jsonData.results || jsonData;",
+									"var ad = results.find(a => a.hiring_request === parseInt(pm.environment.get(\"hiring_request_id\")));",
+									"if (ad) pm.environment.set(\"ad_id\", ad.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/job-advertisements/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "job-advertisements", ""] }
+					}
+				},
+				{
+					"name": "Publish Ad",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"deadline\": \"2026-12-31\",\n    \"platforms\": [\"postman\"]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/job-advertisements/{{ad_id}}/publish/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "job-advertisements", "{{ad_id}}", "publish", ""] }
+					}
+				},
+				{
+					"name": "Create Candidate",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Candidate Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    pm.environment.set(\"candidate_id\", pm.response.json().id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"first_name\": \"Postman\",\n    \"last_name\": \"User\",\n    \"email\": \"postman.user.{{$timestamp}}@example.com\",\n    \"company\": {{company_id}}\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/candidates/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "candidates", ""] }
+					}
+				},
+				{
+					"name": "Create Application",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Application Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    pm.environment.set(\"application_id\", pm.response.json().id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"candidate\": {{candidate_id}},\n    \"job_advertisement\": {{ad_id}},\n    \"notes\": \"Applied via Postman Lifecycle\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/applications/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "applications", ""] }
+					}
+				},
+				{
+					"name": "Move to Interview Stage",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"status\": \"interview\"}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/applications/{{application_id}}/move-to-stage/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "applications", "{{application_id}}", "move-to-stage", ""] }
+					}
+				},
+				{
+					"name": "Schedule Interview",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Interview Scheduled\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    pm.environment.set(\"interview_id\", pm.response.json().id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"application\": {{application_id}},\n    \"interview_type\": \"personal\",\n    \"interview_date\": \"2026-12-01T10:00:00Z\",\n    \"interviewers\": [1]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/interviews/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "interviews", ""] }
+					}
+				},
+				{
+					"name": "Record Interview Result",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"scoring_data\": {\"culture\": 10, \"skills\": 9},\n    \"note\": \"Excellent performance\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/interviews/{{interview_id}}/record-result/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "interviews", "{{interview_id}}", "record-result", ""] }
+					}
+				},
+				{
+					"name": "Create Job Offer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Offer Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    pm.environment.set(\"offer_id\", pm.response.json().id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"application\": {{application_id}},\n    \"salary\": 18000.00,\n    \"start_date\": \"2027-01-01\",\n    \"benefits\": \"Health insurance, Gym\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/offers/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "offers", ""] }
+					}
+				},
+				{
+					"name": "Accept Offer (Bridge Trigger)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"employee_id\": \"POST-{{$timestamp}}\",\n    \"national_id\": \"12345{{$randomInt}}\",\n    \"gender\": \"M\",\n    \"date_of_birth\": \"1992-05-15\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/hris/recruitment/offers/{{offer_id}}/accept/", "host": ["{{base_url}}"], "path": ["api", "hris", "recruitment", "offers", "{{offer_id}}", "accept", ""] }
+					}
+				},
+				{
+					"name": "Final Verification: Check HR Core",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-Tenant", "value": "{{tenant}}", "type": "text" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" }
+						],
+						"url": { "raw": "{{base_url}}/api/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api", "hris", "core", "employees", ""] }
+					}
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+	},
+	"variable": [
+		{ "key": "base_url", "value": "http://localhost:8000", "type": "string" }
+	]
+}
