@@ -1,0 +1,645 @@
+{
+  "info": {
+    "_postman_id": "ouvira-erp-api-v1",
+    "name": "Ouvira ERP API",
+    "description": "Complete Postman collection for the Ouvira ERP backend API.\n\n## Setup\n1. Import this collection\n2. Import `Ouvira_ERP.postman_environment.json`\n3. Run **Auth / Login** — access + refresh tokens are auto-saved to environment variables\n4. All authenticated requests use `{{access_token}}` automatically\n\n## Environments\n- `base_url`: http://localhost:8000 (dev) or https://api.ouvira.com (prod)\n- `tenant`: your tenant subdomain\n\n## Auth Flow\nSignup → OTP Verify → Finalize Sign-in → Login → (optional 2FA) → use access_token",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000", "type": "string" },
+    { "key": "tenant", "value": "demo", "type": "string" },
+    { "key": "access_token", "value": "", "type": "string" },
+    { "key": "refresh_token", "value": "", "type": "string" },
+    { "key": "session_id", "value": "", "type": "string" },
+    { "key": "company_id", "value": "1", "type": "string" },
+    { "key": "user_id", "value": "1", "type": "string" },
+    { "key": "employee_id", "value": "1", "type": "string" },
+    { "key": "hiring_request_id", "value": "1", "type": "string" },
+    { "key": "job_ad_id", "value": "1", "type": "string" },
+    { "key": "candidate_id", "value": "1", "type": "string" },
+    { "key": "application_id", "value": "1", "type": "string" },
+    { "key": "interview_id", "value": "1", "type": "string" },
+    { "key": "offer_id", "value": "1", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "item": [
+
+    {
+      "name": "🔐 Auth",
+      "description": "Authentication, OTP, 2FA, and password management.\nAll endpoints are public (no token required) unless noted.",
+      "item": [
+        {
+          "name": "Signup",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/signup/", "host": ["{{base_url}}"], "path": ["api","v1","auth","signup",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"full_name\": \"Hassan Ashraf\",\n  \"primary_mobile\": \"+201012345678\",\n  \"cf_turnstile_response\": \"XXXX\"\n}" }
+          },
+          "response": [],
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "Finalize Sign-in",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/finalize-signin/", "host": ["{{base_url}}"], "path": ["api","v1","auth","finalize-signin",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"primary_mobile\": \"+201012345678\",\n  \"email\": \"hassan@example.com\",\n  \"password\": \"SecureP@ss123\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login/", "host": ["{{base_url}}"], "path": ["api","v1","auth","login",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"hassan@example.com\",\n  \"password\": \"SecureP@ss123\",\n  \"remember_me\": false,\n  \"cf_turnstile_response\": \"XXXX\"\n}" }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "if (json.access) {",
+              "  pm.collectionVariables.set('access_token', json.access);",
+              "  pm.collectionVariables.set('refresh_token', json.refresh);",
+              "  console.log('Tokens saved');",
+              "}",
+              "if (json.session_id) {",
+              "  pm.collectionVariables.set('session_id', json.session_id);",
+              "  console.log('2FA session saved:', json.session_id);",
+              "}"
+            ]}
+          }],
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/auth/logout/", "host": ["{{base_url}}"], "path": ["api","v1","auth","logout",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 205', () => pm.response.to.have.status(205));",
+            "pm.collectionVariables.set('access_token', '');",
+            "pm.collectionVariables.set('refresh_token', '');"
+          ]}}],
+          "response": []
+        },
+        {
+          "name": "Token Refresh",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/token/refresh/", "host": ["{{base_url}}"], "path": ["api","v1","auth","token","refresh",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json();",
+            "if (json.access) pm.collectionVariables.set('access_token', json.access);",
+            "if (json.refresh) pm.collectionVariables.set('refresh_token', json.refresh);"
+          ]}}],
+          "response": []
+        },
+        {
+          "name": "OTP — Send",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/otp/send/", "host": ["{{base_url}}"], "path": ["api","v1","auth","otp","send",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"hassan@example.com\",\n  \"cf_turnstile_response\": \"XXXX\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "OTP — Verify",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/otp/verify/", "host": ["{{base_url}}"], "path": ["api","v1","auth","otp","verify",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"hassan@example.com\",\n  \"otp\": \"123456\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "OTP — Resend",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/otp/resend/", "host": ["{{base_url}}"], "path": ["api","v1","auth","otp","resend",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"primary_mobile\": \"+201012345678\",\n  \"cf_turnstile_response\": \"XXXX\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "2FA — Enable",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/auth/2fa/enable/", "host": ["{{base_url}}"], "path": ["api","v1","auth","2fa","enable",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "response": []
+        },
+        {
+          "name": "2FA — Verify Code",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/2fa/verify/code/", "host": ["{{base_url}}"], "path": ["api","v1","auth","2fa","verify","code",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"code\": \"123456\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const json = pm.response.json();",
+            "if (json.access) pm.collectionVariables.set('access_token', json.access);",
+            "if (json.refresh) pm.collectionVariables.set('refresh_token', json.refresh);"
+          ]}}],
+          "response": []
+        },
+        {
+          "name": "2FA — Verify Backup Code",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/2fa/verify/backup/", "host": ["{{base_url}}"], "path": ["api","v1","auth","2fa","verify","backup",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"backup_code\": \"BACKUP-CODE-HERE\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "Password — Forgot",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/password/forgot/", "host": ["{{base_url}}"], "path": ["api","v1","auth","password","forgot",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"hassan@example.com\",\n  \"cf_turnstile_response\": \"XXXX\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "Password — Validate Reset Token",
+          "request": {
+            "method": "GET", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/password/validate-reset-token/?token=REPLACE_WITH_64_CHAR_TOKEN", "host": ["{{base_url}}"], "path": ["api","v1","auth","password","validate-reset-token",""], "query": [{ "key": "token", "value": "REPLACE_WITH_64_CHAR_TOKEN" }] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          },
+          "response": []
+        },
+        {
+          "name": "Password — Reset",
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/password/reset/", "host": ["{{base_url}}"], "path": ["api","v1","auth","password","reset",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"REPLACE_WITH_64_CHAR_TOKEN\",\n  \"new_password\": \"NewSecureP@ss123!\",\n  \"confirm_password\": \"NewSecureP@ss123!\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "Password — Change",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/auth/password/change/", "host": ["{{base_url}}"], "path": ["api","v1","auth","password","change",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"old_password\": \"SecureP@ss123\",\n  \"new_password\": \"NewSecureP@ss123!\",\n  \"confirm_password\": \"NewSecureP@ss123!\"\n}" }
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "👤 Account",
+      "description": "User profile management. All endpoints require Bearer token.",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/account/profile/", "host": ["{{base_url}}"], "path": ["api","v1","account","profile",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json();",
+            "pm.collectionVariables.set('user_id', json.id);"
+          ]}}],
+          "response": []
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/api/v1/account/profile/", "host": ["{{base_url}}"], "path": ["api","v1","account","profile",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"full_name\": \"Hassan Ashraf Updated\",\n  \"email\": \"hassan-updated@example.com\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "List Users (Admin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/account/users/?company={{company_id}}", "host": ["{{base_url}}"], "path": ["api","v1","account","users",""], "query": [{ "key": "company", "value": "{{company_id}}" }] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          },
+          "response": []
+        },
+        {
+          "name": "Session Test (Admin/Dev)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/account/session-tests/", "host": ["{{base_url}}"], "path": ["api","v1","account","session-tests",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "🏢 Company",
+      "description": "Company CRUD and settings. GET is open to authenticated members; PUT/PATCH requires admin; DELETE requires owner.",
+      "item": [
+        {
+          "name": "List Companies",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/company/", "host": ["{{base_url}}"], "path": ["api","v1","company",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json();",
+            "const results = json.results || json;",
+            "if (Array.isArray(results) && results.length > 0) pm.collectionVariables.set('company_id', results[0].id);"
+          ]}}],
+          "response": []
+        },
+        {
+          "name": "Create Company",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/company/", "host": ["{{base_url}}"], "path": ["api","v1","company",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Acme Corp\",\n  \"description\": \"A sample company\",\n  \"address\": \"123 Main St, Cairo\",\n  \"is_parent_company\": true\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const json = pm.response.json();",
+            "if (json.id) pm.collectionVariables.set('company_id', json.id);"
+          ]}}],
+          "response": []
+        },
+        {
+          "name": "Get Company",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/company/{{company_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","company","{{company_id}}",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          },
+          "response": []
+        },
+        {
+          "name": "Update Company",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/api/v1/company/{{company_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","company","{{company_id}}",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Updated description\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Company (Owner only)",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/api/v1/company/{{company_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","company","{{company_id}}",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          },
+          "response": []
+        },
+        {
+          "name": "Get Company Settings",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/company/{{company_id}}/settings/", "host": ["{{base_url}}"], "path": ["api","v1","company","{{company_id}}","settings",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          },
+          "response": []
+        },
+        {
+          "name": "Update Company Settings",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/api/v1/company/{{company_id}}/settings/", "host": ["{{base_url}}"], "path": ["api","v1","company","{{company_id}}","settings",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"default_language\": \"en\",\n  \"default_currency\": \"USD\",\n  \"timezone\": \"Africa/Cairo\",\n  \"fiscal_year_start_month\": 1\n}" }
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "🔑 Access Control",
+      "description": "Permissions, Roles, Role-Permission assignments, User-Company memberships, and Invitations.\nGET endpoints: any authenticated user. POST/PUT/PATCH/DELETE: admin only.",
+      "item": [
+        {
+          "name": "Permissions",
+          "item": [
+            { "name": "List Permissions", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/access-control/permissions/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","permissions",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Permission", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/access-control/permissions/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","permissions",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"code\": \"hris.view_employee\",\n  \"module\": \"HRIS\",\n  \"description\": \"Can view employees\"\n}" } }, "response": [] },
+            { "name": "Get Permission", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/access-control/permissions/1/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","permissions","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Permission", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/access-control/permissions/1/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","permissions","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"description\": \"Updated description\"\n}" } }, "response": [] },
+            { "name": "Delete Permission", "request": { "method": "DELETE", "url": { "raw": "{{base_url}}/api/v1/access-control/permissions/1/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","permissions","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+          ]
+        },
+        {
+          "name": "Roles",
+          "item": [
+            { "name": "List Roles", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/access-control/roles/?company={{company_id}}", "host": ["{{base_url}}"], "path": ["api","v1","access-control","roles",""], "query": [{ "key": "company", "value": "{{company_id}}" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Role", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/access-control/roles/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","roles",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"role\": \"HR Manager\",\n  \"desc\": \"Full HR access\",\n  \"company\": {{company_id}},\n  \"is_system_role\": false\n}" } }, "response": [] },
+            { "name": "Get Role", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/access-control/roles/1/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","roles","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Role", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/access-control/roles/1/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","roles","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"desc\": \"Updated description\"\n}" } }, "response": [] },
+            { "name": "Delete Role", "request": { "method": "DELETE", "url": { "raw": "{{base_url}}/api/v1/access-control/roles/1/?company={{company_id}}", "host": ["{{base_url}}"], "path": ["api","v1","access-control","roles","1",""], "query": [{ "key": "company", "value": "{{company_id}}" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+          ]
+        },
+        {
+          "name": "Role Permissions",
+          "item": [
+            { "name": "List Role Permissions", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/access-control/role-permissions/?role=1", "host": ["{{base_url}}"], "path": ["api","v1","access-control","role-permissions",""], "query": [{ "key": "role", "value": "1" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Assign Permission to Role", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/access-control/role-permissions/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","role-permissions",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"role\": 1,\n  \"permission\": 1\n}" } }, "response": [] },
+            { "name": "Remove Permission from Role", "request": { "method": "DELETE", "url": { "raw": "{{base_url}}/api/v1/access-control/role-permissions/1/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","role-permissions","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+          ]
+        },
+        {
+          "name": "User Companies",
+          "item": [
+            { "name": "List User Companies", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/access-control/user-companies/?company={{company_id}}", "host": ["{{base_url}}"], "path": ["api","v1","access-control","user-companies",""], "query": [{ "key": "company", "value": "{{company_id}}" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Associate User with Company", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/access-control/user-companies/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","user-companies",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"user\": {{user_id}},\n  \"company\": {{company_id}},\n  \"is_primary_company\": true,\n  \"is_active\": true\n}" } }, "response": [] },
+            { "name": "Get User Company", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/access-control/user-companies/1/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","user-companies","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Remove User from Company", "request": { "method": "DELETE", "url": { "raw": "{{base_url}}/api/v1/access-control/user-companies/1/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","user-companies","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+          ]
+        },
+        {
+          "name": "User Company Roles",
+          "item": [
+            { "name": "List User Company Roles", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/access-control/user-company-roles/?user_company=1", "host": ["{{base_url}}"], "path": ["api","v1","access-control","user-company-roles",""], "query": [{ "key": "user_company", "value": "1" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Assign Role to User", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/access-control/user-company-roles/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","user-company-roles",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"user_company\": 1,\n  \"role\": 1\n}" } }, "response": [] },
+            { "name": "Remove Role from User", "request": { "method": "DELETE", "url": { "raw": "{{base_url}}/api/v1/access-control/user-company-roles/1/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","user-company-roles","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+          ]
+        },
+        {
+          "name": "Invitations",
+          "item": [
+            { "name": "List Invitations", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/access-control/invitations/?company={{company_id}}&status=pending", "host": ["{{base_url}}"], "path": ["api","v1","access-control","invitations",""], "query": [{ "key": "company", "value": "{{company_id}}" }, { "key": "status", "value": "pending" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Invitation", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/access-control/invitations/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","invitations",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"company\": {{company_id}},\n  \"role\": 1,\n  \"expires_at\": \"2026-12-31T23:59:59Z\"\n}" } }, "response": [] },
+            { "name": "Accept Invitation", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/access-control/invitations/accept/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","invitations","accept",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"token\": \"INVITATION_TOKEN_HERE\"\n}" } }, "response": [] },
+            { "name": "Revoke Invitation", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/access-control/invitations/1/revoke/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","invitations","1","revoke",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"company\": {{company_id}}\n}" } }, "response": [] },
+            { "name": "Resend Invitation", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/access-control/invitations/1/resend/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","invitations","1","resend",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"company\": {{company_id}}\n}" } }, "response": [] }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "👥 HRIS — Core",
+      "description": "Employees, Departments, Job Titles, Positions, Locations, Employments, Attendance.\nAll nested under /api/v1/hris/core/",
+      "item": [
+        {
+          "name": "Locations",
+          "item": [
+            { "name": "List Locations", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/locations/?company_id={{company_id}}", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","locations",""], "query": [{ "key": "company_id", "value": "{{company_id}}" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Location", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/core/locations/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","locations",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Cairo HQ\",\n  \"address\": \"123 Tahrir Square\",\n  \"city\": \"Cairo\",\n  \"country\": \"Egypt\",\n  \"is_active\": true\n}" } }, "response": [] },
+            { "name": "Get Location", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/locations/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","locations","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Location", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/hris/core/locations/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","locations","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"is_active\": false\n}" } }, "response": [] },
+            { "name": "Delete Location", "request": { "method": "DELETE", "url": { "raw": "{{base_url}}/api/v1/hris/core/locations/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","locations","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+          ]
+        },
+        {
+          "name": "Departments",
+          "item": [
+            { "name": "List Departments", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Department", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Engineering\"\n}" } }, "response": [] },
+            { "name": "Get Department", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Department", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Software Engineering\"\n}" } }, "response": [] },
+            { "name": "Delete Department", "request": { "method": "DELETE", "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+          ]
+        },
+        {
+          "name": "Job Titles",
+          "item": [
+            { "name": "List Job Titles", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/job-titles/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","job-titles",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Job Title", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/core/job-titles/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","job-titles",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Senior Backend Engineer\",\n  \"description\": \"Designs and builds backend systems\"\n}" } }, "response": [] },
+            { "name": "Get Job Title", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/job-titles/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","job-titles","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Job Title", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/hris/core/job-titles/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","job-titles","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"description\": \"Updated description\"\n}" } }, "response": [] },
+            { "name": "Delete Job Title", "request": { "method": "DELETE", "url": { "raw": "{{base_url}}/api/v1/hris/core/job-titles/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","job-titles","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+          ]
+        },
+        {
+          "name": "Positions",
+          "item": [
+            { "name": "List Positions", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/positions/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","positions",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Position", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/core/positions/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","positions",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"job_title\": 1,\n  \"department\": 1,\n  \"location\": 1,\n  \"reports_to\": null,\n  \"is_active\": true\n}" } }, "response": [] },
+            { "name": "Get Position", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/positions/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","positions","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Position", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/hris/core/positions/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","positions","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"is_active\": false\n}" } }, "response": [] },
+            { "name": "Delete Position", "request": { "method": "DELETE", "url": { "raw": "{{base_url}}/api/v1/hris/core/positions/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","positions","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+          ]
+        },
+        {
+          "name": "Employees",
+          "item": [
+            { "name": "List Employees", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] },
+              "event": [{ "listen": "test", "script": { "exec": [
+                "const json = pm.response.json();",
+                "const results = json.results || json;",
+                "if (Array.isArray(results) && results.length > 0) pm.collectionVariables.set('employee_id', results[0].id);"
+              ]}}],
+              "response": [] },
+            { "name": "Create Employee", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"employee_id\": \"EMP-001\",\n  \"first_name\": \"Ahmed\",\n  \"last_name\": \"Mohamed\",\n  \"national_id\": \"1234567890\",\n  \"nationality\": \"Egyptian\",\n  \"gender\": \"M\",\n  \"marital_status\": \"S\",\n  \"contact_number\": \"+201012345678\",\n  \"personal_email\": \"ahmed@example.com\",\n  \"location\": 1,\n  \"department\": 1\n}" } }, "response": [] },
+            { "name": "Get Employee", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Employee", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"contact_number\": \"+201098765432\"\n}" } }, "response": [] },
+            { "name": "Delete Employee", "request": { "method": "DELETE", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+          ]
+        },
+        {
+          "name": "Employments (nested)",
+          "item": [
+            { "name": "List Employments", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/employments/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}","employments",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Employment", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/employments/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}","employments",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"hire_date\": \"2026-01-01\",\n  \"status\": \"active\",\n  \"employment_type\": \"full_time\",\n  \"contract_start_date\": \"2026-01-01\",\n  \"contract_end_date\": null\n}" } }, "response": [] },
+            { "name": "Get Employment", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/employments/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}","employments","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Employment", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/employments/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}","employments","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"inactive\"\n}" } }, "response": [] }
+          ]
+        },
+        {
+          "name": "Attendance (nested)",
+          "item": [
+            { "name": "List Attendance", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/attendances/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}","attendances",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Record Attendance (Check-in)", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/attendances/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}","attendances",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"date\": \"2026-04-08\",\n  \"check_in_time\": \"09:00:00\",\n  \"status\": \"present\"\n}" } }, "response": [] },
+            { "name": "Get Attendance Record", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/attendances/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}","attendances","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Attendance (Check-out)", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/attendances/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}","attendances","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"check_out_time\": \"17:00:00\"\n}" } }, "response": [] }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "📋 Recruitment",
+      "description": "Full recruitment pipeline: Hiring Requests → Job Ads → Candidates → Applications → Interviews → Documents → Offers → Onboarding.\n\nWorkflow order:\n1. Create Hiring Request → Submit → Approve\n2. Job Ad is auto-created → Publish\n3. Create Candidate → Create Application\n4. Move to Interview stage → Schedule Interview → Record Result\n5. Upload Documents → Verify\n6. Create Offer → Accept (creates Employee in HRIS)\n7. Create Onboarding checklist",
+      "item": [
+        {
+          "name": "Hiring Requests",
+          "item": [
+            { "name": "List Hiring Requests", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/?company={{company_id}}", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests",""], "query": [{ "key": "company", "value": "{{company_id}}" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Hiring Request", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"company\": {{company_id}},\n  \"job_title\": 1,\n  \"department\": 1,\n  \"vacancies\": 2,\n  \"purpose\": \"Expanding the engineering team for Q2 2026\"\n}" } },
+              "event": [{ "listen": "test", "script": { "exec": [
+                "const json = pm.response.json();",
+                "if (json.id) pm.collectionVariables.set('hiring_request_id', json.id);"
+              ]}}],
+              "response": [] },
+            { "name": "Get Hiring Request", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","{{hiring_request_id}}",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Submit Hiring Request", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/submit/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","{{hiring_request_id}}","submit",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{}" } }, "response": [] },
+            { "name": "Approve Hiring Request (Employee)", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/approve/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","{{hiring_request_id}}","approve",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"role_type\": \"employee\",\n  \"note\": \"Approved by employee\"\n}" } }, "response": [] },
+            { "name": "Approve Hiring Request (HR)", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/approve/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","{{hiring_request_id}}","approve",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"role_type\": \"hr_employee\",\n  \"note\": \"Approved by HR\"\n}" } }, "response": [] },
+            { "name": "Approve Hiring Request (Manager)", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/approve/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","{{hiring_request_id}}","approve",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"role_type\": \"direct_manager\",\n  \"note\": \"Approved by manager\"\n}" } }, "response": [] },
+            { "name": "Reject Hiring Request", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/reject/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","{{hiring_request_id}}","reject",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"role_type\": \"hr_employee\",\n  \"reason\": \"Budget constraints for this quarter\"\n}" } }, "response": [] }
+          ]
+        },
+        {
+          "name": "Job Advertisements",
+          "item": [
+            { "name": "List Job Ads", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/?company={{company_id}}&status=draft", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","job-advertisements",""], "query": [{ "key": "company", "value": "{{company_id}}" }, { "key": "status", "value": "draft" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] },
+              "event": [{ "listen": "test", "script": { "exec": [
+                "const json = pm.response.json();",
+                "const results = json.results || json;",
+                "if (Array.isArray(results) && results.length > 0) pm.collectionVariables.set('job_ad_id', results[0].id);"
+              ]}}],
+              "response": [] },
+            { "name": "Create Job Ad", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","job-advertisements",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"hiring_request\": {{hiring_request_id}},\n  \"title\": \"Senior Backend Engineer\",\n  \"description\": \"We are looking for an experienced backend engineer.\",\n  \"requirements\": \"5+ years Python/Django experience\",\n  \"skills\": [\"Python\", \"Django\", \"PostgreSQL\", \"Redis\"],\n  \"responsibilities\": \"Design and build scalable APIs\",\n  \"city\": \"Cairo\",\n  \"area\": \"Maadi\",\n  \"deadline\": \"2026-06-30\",\n  \"platforms\": [\"internal\", \"linkedin\"]\n}" } },
+              "event": [{ "listen": "test", "script": { "exec": [
+                "const json = pm.response.json();",
+                "if (json.id) pm.collectionVariables.set('job_ad_id', json.id);"
+              ]}}],
+              "response": [] },
+            { "name": "Get Job Ad", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","job-advertisements","{{job_ad_id}}",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Publish Job Ad", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/publish/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","job-advertisements","{{job_ad_id}}","publish",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"deadline\": \"2026-06-30\",\n  \"platforms\": [\"internal\", \"linkedin\"]\n}" } }, "response": [] },
+            { "name": "Close Job Ad", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/close/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","job-advertisements","{{job_ad_id}}","close",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{}" } }, "response": [] }
+          ]
+        },
+        {
+          "name": "Candidates",
+          "item": [
+            { "name": "List Candidates", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/?company={{company_id}}&search=Ahmed", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates",""], "query": [{ "key": "company", "value": "{{company_id}}" }, { "key": "search", "value": "Ahmed" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Candidate", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"first_name\": \"Sara\",\n  \"last_name\": \"Ali\",\n  \"email\": \"sara.ali@example.com\",\n  \"phone\": \"+201012345678\",\n  \"linkedin_url\": \"https://linkedin.com/in/sara-ali\",\n  \"source\": \"LinkedIn\",\n  \"company\": {{company_id}}\n}" } },
+              "event": [{ "listen": "test", "script": { "exec": [
+                "const json = pm.response.json();",
+                "if (json.id) pm.collectionVariables.set('candidate_id', json.id);"
+              ]}}],
+              "response": [] },
+            { "name": "Get Candidate", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/{{candidate_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates","{{candidate_id}}",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Candidate", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/{{candidate_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates","{{candidate_id}}",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"phone\": \"+201098765432\"\n}" } }, "response": [] }
+          ]
+        },
+        {
+          "name": "Job Applications",
+          "item": [
+            { "name": "List Applications", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/?company={{company_id}}&status=applied", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications",""], "query": [{ "key": "company", "value": "{{company_id}}" }, { "key": "status", "value": "applied" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Application", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"candidate\": {{candidate_id}},\n  \"job_advertisement\": {{job_ad_id}}\n}" } },
+              "event": [{ "listen": "test", "script": { "exec": [
+                "const json = pm.response.json();",
+                "if (json.id) pm.collectionVariables.set('application_id', json.id);"
+              ]}}],
+              "response": [] },
+            { "name": "Get Application", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/{{application_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications","{{application_id}}",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Move to Phone Screening", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/{{application_id}}/move-to-stage/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications","{{application_id}}","move-to-stage",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"phone_screening\"\n}" } }, "response": [] },
+            { "name": "Move to Interview", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/{{application_id}}/move-to-stage/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications","{{application_id}}","move-to-stage",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"interview\",\n  \"classification\": \"shortlist_1\"\n}" } }, "response": [] },
+            { "name": "Move to Offer", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/{{application_id}}/move-to-stage/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications","{{application_id}}","move-to-stage",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"offer\"\n}" } }, "response": [] },
+            { "name": "Reject Application", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/{{application_id}}/move-to-stage/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications","{{application_id}}","move-to-stage",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"rejected\"\n}" } }, "response": [] }
+          ]
+        },
+        {
+          "name": "Interviews",
+          "item": [
+            { "name": "List Interviews", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/interviews/?application={{application_id}}", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","interviews",""], "query": [{ "key": "application", "value": "{{application_id}}" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Schedule Interview", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/interviews/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","interviews",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"application\": {{application_id}},\n  \"interview_type\": \"personal\",\n  \"interview_date\": \"2026-05-15T10:00:00Z\",\n  \"interviewers\": [1]\n}" } },
+              "event": [{ "listen": "test", "script": { "exec": [
+                "const json = pm.response.json();",
+                "if (json.id) pm.collectionVariables.set('interview_id', json.id);"
+              ]}}],
+              "response": [] },
+            { "name": "Get Interview", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/interviews/{{interview_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","interviews","{{interview_id}}",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Record Interview Result", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/interviews/{{interview_id}}/record-result/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","interviews","{{interview_id}}","record-result",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"scoring_data\": {\n    \"technical_skills\": 8,\n    \"communication\": 9,\n    \"problem_solving\": 7,\n    \"culture_fit\": 9\n  },\n  \"note\": \"Strong candidate, recommended for offer\"\n}" } }, "response": [] }
+          ]
+        },
+        {
+          "name": "Candidate Documents",
+          "item": [
+            { "name": "List Documents", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/documents/?candidate={{candidate_id}}", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","documents",""], "query": [{ "key": "candidate", "value": "{{candidate_id}}" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Upload Document", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/documents/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","documents",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }], "body": { "mode": "formdata", "formdata": [{ "key": "candidate", "value": "{{candidate_id}}", "type": "text" }, { "key": "doc_type", "value": "id_copy", "type": "text" }, { "key": "file", "type": "file", "src": "" }] } }, "response": [] },
+            { "name": "Verify Document", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/documents/1/verify/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","documents","1","verify",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"approved\",\n  \"note\": \"Document verified and approved\"\n}" } }, "response": [] }
+          ]
+        },
+        {
+          "name": "Job Offers",
+          "item": [
+            { "name": "List Offers", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/offers/?company={{company_id}}", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","offers",""], "query": [{ "key": "company", "value": "{{company_id}}" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Offer", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/offers/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","offers",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"application\": {{application_id}},\n  \"salary\": \"25000.00\",\n  \"allowance\": \"2000.00\",\n  \"benefits\": \"Health insurance, 21 days annual leave, remote work\",\n  \"start_date\": \"2026-06-01\",\n  \"note\": \"Competitive offer for senior role\"\n}" } },
+              "event": [{ "listen": "test", "script": { "exec": [
+                "const json = pm.response.json();",
+                "if (json.id) pm.collectionVariables.set('offer_id', json.id);"
+              ]}}],
+              "response": [] },
+            { "name": "Get Offer", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/offers/{{offer_id}}/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","offers","{{offer_id}}",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Accept Offer (→ creates Employee)", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/offers/{{offer_id}}/accept/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","offers","{{offer_id}}","accept",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"employee_id\": \"EMP-2026-001\",\n  \"national_id\": \"1234567890\",\n  \"gender\": \"F\",\n  \"date_of_birth\": \"1995-03-15\"\n}" } }, "response": [] },
+            { "name": "Decline Offer", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/offers/{{offer_id}}/decline/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","offers","{{offer_id}}","decline",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Candidate accepted another offer\"\n}" } }, "response": [] }
+          ]
+        },
+        {
+          "name": "Onboarding",
+          "item": [
+            { "name": "List Onboarding", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/onboarding/?company={{company_id}}", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","onboarding",""], "query": [{ "key": "company", "value": "{{company_id}}" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Create Onboarding", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/onboarding/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","onboarding",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"candidate\": {{candidate_id}},\n  \"tasks\": {\n    \"workspace_setup\": false,\n    \"email_created\": false,\n    \"id_badge\": false,\n    \"equipment_issued\": false,\n    \"hr_orientation\": false\n  },\n  \"status\": \"not_started\"\n}" } }, "response": [] },
+            { "name": "Get Onboarding", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/onboarding/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","onboarding","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+            { "name": "Update Onboarding Tasks", "request": { "method": "PATCH", "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/onboarding/1/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","onboarding","1",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"tasks\": {\n    \"workspace_setup\": true,\n    \"email_created\": true,\n    \"id_badge\": false,\n    \"equipment_issued\": true,\n    \"hr_orientation\": false\n  },\n  \"status\": \"in_progress\"\n}" } }, "response": [] }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "📊 Audit",
+      "description": "Notifications, activity logs, and security audit logs.",
+      "item": [
+        { "name": "List Notifications", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/audit/notifications/?unread=true", "host": ["{{base_url}}"], "path": ["api","v1","audit","notifications",""], "query": [{ "key": "unread", "value": "true" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+        { "name": "Mark Notification Read", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/audit/notifications/mark-read/", "host": ["{{base_url}}"], "path": ["api","v1","audit","notifications","mark-read",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"notification_id\": 1\n}" } }, "response": [] },
+        { "name": "Mark All Notifications Read", "request": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/audit/notifications/mark-read/", "host": ["{{base_url}}"], "path": ["api","v1","audit","notifications","mark-read",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"all\": true\n}" } }, "response": [] },
+        { "name": "List Activity Logs (Admin)", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/audit/activity-logs/?company={{company_id}}", "host": ["{{base_url}}"], "path": ["api","v1","audit","activity-logs",""], "query": [{ "key": "company", "value": "{{company_id}}" }] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+        { "name": "My Activity Logs", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/audit/activity-logs/my/", "host": ["{{base_url}}"], "path": ["api","v1","audit","activity-logs","my",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] },
+        { "name": "Security Audit Logs", "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/v1/audit/security-logs/", "host": ["{{base_url}}"], "path": ["api","v1","audit","security-logs",""] }, "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }] }, "response": [] }
+      ]
+    },
+    {
+      "name": "🩺 Utility",
+      "description": "Health check, API root, and documentation endpoints. No auth required.",
+      "item": [
+        { "name": "API Root", "request": { "method": "GET", "auth": { "type": "noauth" }, "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] }, "header": [] }, "response": [] },
+        { "name": "Health Check", "request": { "method": "GET", "auth": { "type": "noauth" }, "url": { "raw": "{{base_url}}/health/", "host": ["{{base_url}}"], "path": ["health",""] }, "header": [] },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Health OK', () => pm.response.to.have.status(200));",
+            "pm.test('Status is ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+          ]}}],
+          "response": [] },
+        { "name": "Swagger UI", "request": { "method": "GET", "auth": { "type": "noauth" }, "url": { "raw": "{{base_url}}/swagger/", "host": ["{{base_url}}"], "path": ["swagger",""] }, "header": [] }, "response": [] },
+        { "name": "OpenAPI JSON Schema", "request": { "method": "GET", "auth": { "type": "noauth" }, "url": { "raw": "{{base_url}}/swagger.json", "host": ["{{base_url}}"], "path": ["swagger.json"] }, "header": [] }, "response": [] }
+      ]
+    }
+  ]
+}
