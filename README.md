@@ -22,16 +22,17 @@ Ouvira is an enterprise-grade backend system that enables organizations to:
 | Component | Technology |
 |-----------|------------|
 | **Framework** | Django 5.2.9 + DRF 3.16.1 |
-| **Auth** | JWT (simplejwt) + OTP (pyotp) + 2FA (TOTP) |
-| **Database** | PostgreSQL 15 |
-| **Cache/Broker** | Redis (caching + Celery broker) |
-| **Multi-tenancy** | django-tenants (schema isolation) |
-| **API Docs** | Swagger / ReDoc (drf-yasg) |
+| **Auth** | JWT (simplejwt 5.5.1) + OTP (pyotp 2.9.0) + 2FA (TOTP) |
+| **Database** | PostgreSQL 15 + psycopg2-binary 2.9.11 |
+| **Cache/Broker** | Redis 7.4.0 (caching + Celery broker) |
+| **Multi-tenancy** | django-tenants 3.10.1 (schema isolation) |
+| **API Docs** | Swagger / ReDoc (drf-yasg 1.21.11) |
 | **Container** | Docker & Docker Compose |
 | **Python** | 3.10 |
-| **Task Queue** | Celery + Celery Beat |
-| **CI/CD** | GitHub Actions |
-| **Integrations** | Twilio SMS, Vonage, Resend Email, Cloudflare Turnstile |
+| **Task Queue** | Celery 5.6.3 + django-celery-beat 2.9.0 |
+| **CI/CD** | GitHub Actions (lint, test, docker, security) |
+| **Integrations** | Twilio 9.10.4, Vonage 4.7.2, Resend (anymail 13.0), Cloudflare Turnstile |
+| **Geo/IP** | geoip2 5.1.0 + django-ipware 7.0.1 |
 
 ---
 
@@ -118,21 +119,27 @@ backend/apps/
 └── notifications/         # Notification preferences
 ```
 
-### Layered Architecture Pattern
+### API Structure
 
-Each module follows a consistent layered pattern:
+All endpoints are versioned under `/api/v1/`:
 
-```
-Request → Middleware (Tenant) → View → Serializer → Permission → Service → Model
-```
+| Domain | Base Path |
+|--------|-----------|
+| Authentication & 2FA | `/api/v1/auth/` |
+| User account & profile | `/api/v1/account/` |
+| Roles, permissions, invitations | `/api/v1/access-control/` |
+| Company management | `/api/v1/company/` |
+| HRIS (employees, departments, attendance) | `/api/v1/hris/core/` |
+| Recruitment pipeline | `/api/v1/hris/recruitment/` |
+| Leave management | `/api/v1/hris/leave/` |
+| Expense management | `/api/v1/hris/expense/` |
+| Travel management | `/api/v1/hris/travel/` |
+| Performance reviews | `/api/v1/hris/performance/` |
+| Analytics & reporting | `/api/v1/hris/analytics/` |
+| Offboarding & termination | `/api/v1/hris/termination/` |
+| Audit logs & notifications | `/api/v1/audit/` |
 
-**Layer Responsibilities:**
-- **Models**: Data structure, relationships, soft delete
-- **Services**: Business logic, external API calls, complex operations
-- **Serializers**: Input validation, output formatting
-- **Views**: HTTP handling, response formatting
-- **Permissions**: Access control (RBAC)
-- **Middleware**: Tenant routing, CORS, security
+See [api_documentation.md](api_documentation.md) for full endpoint reference.
 
 ---
 
@@ -237,13 +244,18 @@ docker compose exec backend python manage.py createsuperuser
 docker compose logs -f backend
 ```
 
-**Services Available:**
-- **Backend API**: `http://localhost:8000`
-- **Swagger UI**: `http://localhost:8000/swagger/`
-- **ReDoc**: `http://localhost:8000/redoc/`
-- **Admin**: `http://localhost:8000/admin/`
-- **PostgreSQL**: `localhost:5432`
-- **Redis**: `localhost:6379`
+**Services available:**
+
+| Service | URL |
+|---------|-----|
+| Backend API | `http://localhost:8000` |
+| API Root | `http://localhost:8000/` |
+| Health Check | `http://localhost:8000/health/` |
+| Swagger UI | `http://localhost:8000/swagger/` |
+| ReDoc | `http://localhost:8000/redoc/` |
+| Admin | `http://localhost:8000/admin/` |
+| PostgreSQL | `localhost:5432` |
+| Redis | `localhost:6379` |
 
 ### 4. Local Development (Without Docker)
 

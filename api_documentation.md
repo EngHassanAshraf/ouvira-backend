@@ -1,45 +1,47 @@
 # Ouvira API Documentation
 
-**Version:** 1.0.0  
-**Base URL:** `http://localhost:8000` (development) | `https://api.ouvira.com` (production)  
+**Version:** v1
+**Base URL:** `http://localhost:8000` (development) | `https://api.ouvira.com` (production)
 **Content-Type:** `application/json`
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 1. [API Overview](#api-overview)
 2. [Authentication](#authentication)
 3. [Error Handling](#error-handling)
 4. [Endpoints](#endpoints)
-   - [Authentication](#1-authentication---apiauth)
-   - [Account Management](#2-account-management---apiaccount)
-   - [Access Control](#3-access-control---apiaccess-control)
-   - [Company](#4-company---apicompany)
-   - [Audit](#5-audit---apiaudit)
-   - [HRIS Core](#6-hris-core---apihris)
-   - [Recruitment](#7-recruitment---apihrisrecruitment)
-5. [Pagination](#pagination)
-6. [Rate Limiting](#rate-limiting)
+   - [Auth](#1-auth--apiv1auth)
+   - [Account](#2-account--apiv1account)
+   - [Access Control](#3-access-control--apiv1access-control)
+   - [Company](#4-company--apiv1company)
+   - [HRIS Core](#5-hris-core--apiv1hriscore)
+   - [Recruitment](#6-recruitment--apiv1hrisrecruitment)
+   - [Audit](#7-audit--apiv1audit)
+5. [Utility Endpoints](#utility-endpoints)
+6. [Pagination](#pagination)
+7. [Rate Limiting](#rate-limiting)
 
 ---
 
 ## API Overview
 
 ### Versioning
-The API uses URL-based versioning. All endpoints are prefixed with `/api/`.
+
+All endpoints are versioned under `/api/v1/`. Future versions will be available at `/api/v2/` etc. without breaking existing clients.
 
 ### Required Headers
 
-All authenticated endpoints require:
-```
-Authorization: Bearer <access_token>
-X-Tenant: <tenant_subdomain>
-```
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Authorization` | Yes (authenticated) | `Bearer <access_token>` |
+| `X-Tenant` | Yes | Tenant subdomain for schema routing |
+| `Content-Type` | Yes (POST/PUT/PATCH) | `application/json` |
 
 ### Response Format
 
-**Success Response:**
+**Single resource:**
 ```json
 {
   "id": 1,
@@ -48,29 +50,24 @@ X-Tenant: <tenant_subdomain>
 }
 ```
 
-**List Response:**
+**Paginated list:**
 ```json
 {
   "count": 100,
-  "next": "http://api.ouvira.com/endpoint?page=2",
+  "next": "https://api.ouvira.com/api/v1/endpoint/?page=2",
   "previous": null,
-  "results": [...]
+  "results": []
 }
 ```
 
-**Error Response:**
+**Error:**
 ```json
-{
-  "detail": "Error message here"
-}
+{ "detail": "Error message" }
 ```
 
-or
-
+**Validation error:**
 ```json
-{
-  "field_name": ["Error message for this field"]
-}
+{ "field_name": ["Error message for this field"] }
 ```
 
 ---
@@ -79,24 +76,18 @@ or
 
 ### Token Lifecycle
 
-| Token Type | Lifetime | Usage |
-|------------|----------|-------|
-| Access Token | 1 hour | API authentication |
+| Token | Lifetime | Purpose |
+|-------|----------|---------|
+| Access Token | 15 minutes | Authenticate API requests |
 | Refresh Token | 7 days | Obtain new access token |
 
-### Obtaining Tokens
+### Flows
 
-1. **Signup Flow:**
-   - `POST /api/auth/signup/` → OTP sent
-   - `POST /api/auth/finalize-signin/` → Tokens returned
+**Signup:** `POST /api/v1/auth/signup/` → OTP sent → `POST /api/v1/auth/finalize-signin/` → tokens
 
-2. **Login Flow:**
-   - `POST /api/auth/login/` → Tokens returned (or 2FA required)
-   - If 2FA enabled: `POST /api/auth/login-2fa-verify-code/` → Tokens returned
+**Login:** `POST /api/v1/auth/login/` → tokens (or 2FA challenge) → `POST /api/v1/auth/2fa/verify/code/` → tokens
 
-### Using Tokens
-
-Include in all authenticated requests:
+**Token usage:**
 ```
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
@@ -105,46 +96,26 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## Error Handling
 
-### HTTP Status Codes
-
-| Code | Meaning | Description |
-|------|---------|-------------|
-| 200 | OK | Successful request |
-| 201 | Created | Resource created successfully |
-| 204 | No Content | Successful deletion |
-| 400 | Bad Request | Invalid input data |
-| 401 | Unauthorized | Missing or invalid authentication |
-| 403 | Forbidden | Insufficient permissions |
-| 404 | Not Found | Resource not found |
-| 429 | Too Many Requests | Rate limit exceeded |
-| 500 | Internal Server Error | Server error |
-
-### Error Response Format
-
-```json
-{
-  "detail": "Human-readable error message"
-}
-```
-
-For validation errors:
-```json
-{
-  "email": ["Enter a valid email address."],
-  "password": ["This field is required."]
-}
-```
+| Code | Meaning |
+|------|---------|
+| 200 | OK |
+| 201 | Created |
+| 204 | No Content |
+| 400 | Bad Request — invalid input |
+| 401 | Unauthorized — missing or expired token |
+| 403 | Forbidden — insufficient permissions |
+| 404 | Not Found |
+| 429 | Too Many Requests — rate limit hit |
+| 500 | Internal Server Error |
 
 ---
 
 ## Endpoints
 
-### 1. Authentication — `/api/auth/`
+### 1. Auth — `/api/v1/auth/`
 
-#### POST `/api/auth/signup/`
+#### POST `/api/v1/auth/signup/`
 **Auth:** None | **Rate:** 3/hour
-
-Start the signup process by sending an OTP.
 
 **Request:**
 ```json
@@ -153,329 +124,154 @@ Start the signup process by sending an OTP.
   "primary_mobile": "+201234567890"
 }
 ```
-
 **Response (201):**
 ```json
-{
-  "message": "OTP sent successfully",
-  "primary_mobile": "+201234567890"
-}
+{ "message": "OTP sent successfully", "primary_mobile": "+201234567890" }
 ```
 
 ---
 
-#### POST `/api/auth/finalize-signin/`
+#### POST `/api/v1/auth/finalize-signin/`
 **Auth:** None | **Rate:** 3/hour
-
-Complete signup after OTP verification.
 
 **Request:**
 ```json
 {
   "primary_mobile": "+201234567890",
-  "email": "hassan@example.com",
+  "email": "user@example.com",
   "password": "SecureP@ss123"
 }
 ```
-
 **Response (201):**
 ```json
 {
   "message": "Account created successfully",
-  "tokens": {
-    "access": "eyJ...",
-    "refresh": "eyJ..."
-  }
+  "tokens": { "access": "eyJ...", "refresh": "eyJ..." }
 }
 ```
 
 ---
 
-#### POST `/api/auth/login/`
+#### POST `/api/v1/auth/login/`
 **Auth:** None | **Rate:** 5/min
 
-Login with email or phone number.
-
 **Request:**
 ```json
 {
-  "identifier": "hassan@example.com",
-  "password": "SecureP@ss123"
+  "identifier": "user@example.com",
+  "password": "SecureP@ss123",
+  "cf_turnstile_response": "<turnstile-token>"
 }
 ```
-
-**Response (200) — without 2FA:**
+**Response (200) — no 2FA:**
 ```json
 {
-  "tokens": {
-    "access": "eyJ...",
-    "refresh": "eyJ..."
-  },
-  "user": {
-    "id": 1,
-    "username": "hassan",
-    "full_name": "Hassan Ashraf",
-    "email": "hassan@example.com"
-  }
+  "tokens": { "access": "eyJ...", "refresh": "eyJ..." },
+  "user": { "id": 1, "username": "hassan", "full_name": "Hassan Ashraf", "email": "user@example.com" }
 }
 ```
-
-**Response (200) — with 2FA enabled:**
+**Response (200) — 2FA required:**
 ```json
-{
-  "requires_2fa": true,
-  "session_id": "uuid-session-id"
-}
+{ "requires_2fa": true, "session_id": "uuid-session-id" }
 ```
 
 ---
 
-#### POST `/api/auth/token/refresh/`
-**Auth:** None | **Rate:** 20/min
-
-Refresh access token using refresh token.
-
-**Request:**
-```json
-{
-  "refresh": "eyJ..."
-}
-```
-
-**Response (200):**
-```json
-{
-  "access": "eyJ...",
-  "refresh": "eyJ..."
-}
-```
-
----
-
-#### POST `/api/auth/logout/`
+#### POST `/api/v1/auth/logout/`
 **Auth:** Bearer Token
 
-Logout and blacklist the refresh token.
-
 **Request:**
 ```json
-{
-  "refresh": "eyJ..."
-}
+{ "refresh": "eyJ..." }
 ```
-
 **Response (205):**
 ```json
-{
-  "detail": "Successfully logged out."
-}
+{ "detail": "Successfully logged out." }
 ```
 
 ---
 
-#### POST `/api/auth/settings_enable-2fa/`
-**Auth:** Bearer Token | **Rate:** 10/hour
-
-Enable two-factor authentication.
+#### POST `/api/v1/auth/token/refresh/`
+**Auth:** None | **Rate:** 20/min
 
 **Request:**
 ```json
-{
-  "method": "totp"
-}
+{ "refresh": "eyJ..." }
+```
+**Response (200):**
+```json
+{ "access": "eyJ...", "refresh": "eyJ..." }
 ```
 
-**Response (200):**
+---
+
+#### OTP Endpoints
+
+| Method | Endpoint | Rate | Description |
+|--------|----------|------|-------------|
+| POST | `/api/v1/auth/otp/send/` | 1/min | Send OTP via email or SMS |
+| POST | `/api/v1/auth/otp/verify/` | 5/min | Verify OTP |
+| POST | `/api/v1/auth/otp/resend/` | 3/hour | Resend OTP |
+
+**Send/Resend request:**
+```json
+{ "identifier": "user@example.com" }
+```
+**Verify request:**
+```json
+{ "identifier": "user@example.com", "otp": "123456" }
+```
+
+---
+
+#### Two-Factor Authentication
+
+| Method | Endpoint | Rate | Description |
+|--------|----------|------|-------------|
+| POST | `/api/v1/auth/2fa/enable/` | 10/hour | Enable TOTP 2FA |
+| POST | `/api/v1/auth/2fa/verify/code/` | 5/min | Verify TOTP code during login |
+| POST | `/api/v1/auth/2fa/verify/backup/` | 5/min | Verify backup code during login |
+
+**Enable response (200):**
 ```json
 {
   "secret": "BASE32SECRET",
-  "qr_code": "otpauth://totp/Ouvira:hassan@example.com?secret=BASE32SECRET&issuer=Ouvira",
+  "qr_code": "otpauth://totp/Ouvira:user@example.com?secret=BASE32SECRET&issuer=Ouvira",
   "backup_codes": ["code1", "code2", "code3", "code4", "code5"]
 }
 ```
 
----
-
-#### POST `/api/auth/login-2fa-verify-code/`
-**Auth:** None | **Rate:** 5/min
-
-Verify 2FA code during login.
-
-**Request:**
+**Verify code request:**
 ```json
-{
-  "session_id": "uuid-session-id",
-  "code": "123456"
-}
-```
-
-**Response (200):**
-```json
-{
-  "tokens": {
-    "access": "eyJ...",
-    "refresh": "eyJ..."
-  }
-}
+{ "session_id": "uuid-session-id", "code": "123456" }
 ```
 
 ---
 
-#### POST `/api/auth/login-2fa-verify-backup/`
-**Auth:** None | **Rate:** 5/min
+#### Password Management
 
-Verify backup code during login.
+| Method | Endpoint | Rate | Auth | Description |
+|--------|----------|------|------|-------------|
+| POST | `/api/v1/auth/password/forgot/` | 3/hour | None | Request reset link |
+| GET | `/api/v1/auth/password/validate-reset-token/` | — | None | Validate reset token (`?token=...`) |
+| POST | `/api/v1/auth/password/reset/` | 3/hour | None | Reset with token |
+| POST | `/api/v1/auth/password/change/` | 10/hour | Bearer | Change current password |
 
-**Request:**
+**Reset request:**
 ```json
-{
-  "session_id": "uuid-session-id",
-  "backup_code": "backup-code-here"
-}
+{ "token": "b4b2c1d3...", "new_password": "NewSecureP@ss123!" }
 ```
-
-**Response (200):**
+**Change request:**
 ```json
-{
-  "tokens": {
-    "access": "eyJ...",
-    "refresh": "eyJ..."
-  }
-}
+{ "old_password": "CurrentP@ss123!", "new_password": "NewSecureP@ss123!" }
 ```
 
 ---
 
-#### POST `/api/auth/otp/send/`
-**Auth:** None | **Rate:** 1/min
+### 2. Account — `/api/v1/account/`
 
-Send OTP via email or SMS.
-
-**Request:**
-```json
-{
-  "identifier": "hassan@example.com"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "OTP sent successfully"
-}
-```
-
----
-
-#### POST `/api/auth/otp/verify/`
-**Auth:** None | **Rate:** 5/min
-
-Verify OTP.
-
-**Request:**
-```json
-{
-  "identifier": "hassan@example.com",
-  "otp": "123456"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "OTP verified successfully"
-}
-```
-
----
-
-#### POST `/api/auth/password/forgot/`
-**Auth:** None | **Rate:** 3/hour
-
-Request password reset.
-
-**Request:**
-```json
-{
-  "identifier": "hassan@example.com"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "If an account with that identifier exists, a password reset link has been sent."
-}
-```
-
----
-
-#### GET `/api/auth/password/validate-reset-token/`
-**Auth:** None
-
-Validate password reset token.
-
-**Query Params:** `?token=b4b2c1d3...`
-
-**Response (200):**
-```json
-{
-  "valid": true
-}
-```
-
----
-
-#### POST `/api/auth/password/reset/`
-**Auth:** None | **Rate:** 3/hour
-
-Reset password with token.
-
-**Request:**
-```json
-{
-  "token": "b4b2c1d3...",
-  "new_password": "NewSecurePassword123!"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "Password reset successfully"
-}
-```
-
----
-
-#### POST `/api/auth/password/change/`
-**Auth:** Bearer Token | **Rate:** 10/hour
-
-Change password (when current password is known).
-
-**Request:**
-```json
-{
-  "old_password": "CurrentSecurePassword123!",
-  "new_password": "NewSecurePassword123!"
-}
-```
-
-**Response (200):**
-```json
-{
-  "message": "Password updated successfully"
-}
-```
-
----
-
-### 2. Account Management — `/api/account/`
-
-#### GET `/api/account/profile/`
+#### GET/PUT/PATCH `/api/v1/account/profile/`
 **Auth:** Bearer Token
-
-Get current user profile.
 
 **Response (200):**
 ```json
@@ -483,7 +279,7 @@ Get current user profile.
   "id": 1,
   "username": "hassan",
   "full_name": "Hassan Ashraf",
-  "email": "hassan@example.com",
+  "email": "user@example.com",
   "primary_mobile": "+201234567890",
   "email_verified": true,
   "phone_verified": true,
@@ -491,80 +287,35 @@ Get current user profile.
   "is_2fa_enabled": false,
   "two_fa_type": "AUTHENTICATOR",
   "date_joined": "2026-01-15T10:00:00Z",
-  "last_login": "2026-03-24T22:00:00Z"
+  "last_login": "2026-04-08T10:00:00Z"
 }
 ```
 
 ---
 
-#### PUT/PATCH `/api/account/profile/`
-**Auth:** Bearer Token
+#### GET `/api/v1/account/users/`
+**Auth:** Bearer + Admin | **Query:** `?company=<id>`
 
-Update user profile.
-
-**Request:**
-```json
-{
-  "full_name": "Hassan Ashraf",
-  "email": "hassan-updated@example.com"
-}
-```
-
-**Response (200):** Returns full user profile.
+Returns paginated list of active users.
 
 ---
 
-#### GET `/api/account/users/`
-**Auth:** Bearer + Admin
-
-List all active system users.
-
-**Query Params:** `?company=<id>`
-
-**Response (200):**
-```json
-{
-  "count": 1,
-  "next": null,
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "username": "hassan",
-      "full_name": "Hassan Ashraf",
-      "email": "hassan@example.com",
-      "primary_mobile": "+201234567890",
-      "is_active": true,
-      "date_joined": "2026-01-15T10:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### 3. Access Control — `/api/access-control/`
+### 3. Access Control — `/api/v1/access-control/`
 
 #### Permissions
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/access-control/permissions/` | List all permissions |
-| POST | `/api/access-control/permissions/` | Create permission |
-| GET | `/api/access-control/permissions/{id}/` | Get permission details |
-| PUT | `/api/access-control/permissions/{id}/` | Update permission |
-| PATCH | `/api/access-control/permissions/{id}/` | Partial update |
-| DELETE | `/api/access-control/permissions/{id}/` | Delete permission |
+| GET/POST | `/api/v1/access-control/permissions/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/access-control/permissions/{id}/` | Detail / update / delete |
 
-**Permission Object:**
+**Object:**
 ```json
 {
   "id": 1,
-  "code": "can_edit_company",
-  "module": "company",
-  "description": "Can edit company details",
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-01-15T10:00:00Z"
+  "code": "hris_recruitment.view_hiring_request",
+  "module": "Recruitment",
+  "description": "Can view hiring requests"
 }
 ```
 
@@ -574,23 +325,17 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/access-control/roles/` | List all roles |
-| POST | `/api/access-control/roles/` | Create role |
-| GET | `/api/access-control/roles/{id}/` | Get role details |
-| PUT | `/api/access-control/roles/{id}/` | Update role |
-| PATCH | `/api/access-control/roles/{id}/` | Partial update |
-| DELETE | `/api/access-control/roles/{id}/` | Delete role |
+| GET/POST | `/api/v1/access-control/roles/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/access-control/roles/{id}/` | Detail / update / delete |
 
-**Role Object:**
+**Object:**
 ```json
 {
   "id": 1,
-  "role": "Editor",
-  "desc": "Can edit content",
+  "role": "HR Manager",
+  "desc": "Full HR access",
   "company": 1,
-  "is_system_role": false,
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-01-15T10:00:00Z"
+  "is_system_role": false
 }
 ```
 
@@ -600,9 +345,8 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/access-control/role-permissions/` | List role permissions |
-| POST | `/api/access-control/role-permissions/` | Assign permission to role |
-| DELETE | `/api/access-control/role-permissions/{id}/` | Remove permission from role |
+| GET/POST | `/api/v1/access-control/role-permissions/` | List / assign |
+| GET/DELETE | `/api/v1/access-control/role-permissions/{id}/` | Detail / remove |
 
 ---
 
@@ -610,11 +354,8 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/access-control/user-companies/` | List user-company associations |
-| POST | `/api/access-control/user-companies/` | Associate user with company |
-| GET | `/api/access-control/user-companies/{id}/` | Get association details |
-| PUT | `/api/access-control/user-companies/{id}/` | Update association |
-| DELETE | `/api/access-control/user-companies/{id}/` | Remove association |
+| GET/POST | `/api/v1/access-control/user-companies/` | List / associate |
+| GET/PUT/PATCH/DELETE | `/api/v1/access-control/user-companies/{id}/` | Detail / update / remove |
 
 ---
 
@@ -622,9 +363,8 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/access-control/user-company-roles/` | List user roles in companies |
-| POST | `/api/access-control/user-company-roles/` | Assign role to user in company |
-| DELETE | `/api/access-control/user-company-roles/{id}/` | Remove role from user |
+| GET/POST | `/api/v1/access-control/user-company-roles/` | List / assign |
+| GET/DELETE | `/api/v1/access-control/user-company-roles/{id}/` | Detail / remove |
 
 ---
 
@@ -632,15 +372,13 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/access-control/invitations/` | List invitations |
-| POST | `/api/access-control/invitations/` | Create invitation |
-| GET | `/api/access-control/invitations/{id}/` | Get invitation details |
-| PUT | `/api/access-control/invitations/{id}/` | Update invitation |
-| DELETE | `/api/access-control/invitations/{id}/` | Revoke invitation |
-| POST | `/api/access-control/invitations/accept/` | Accept invitation |
-| POST | `/api/access-control/invitations/{id}/resend/` | Resend invitation |
+| GET/POST | `/api/v1/access-control/invitations/` | List / create |
+| POST | `/api/v1/access-control/invitations/accept/` | Accept invitation |
+| GET/PUT/PATCH | `/api/v1/access-control/invitations/{id}/` | Detail / update |
+| POST | `/api/v1/access-control/invitations/{id}/revoke/` | Revoke |
+| POST | `/api/v1/access-control/invitations/{id}/resend/` | Resend |
 
-**Invitation Object:**
+**Object:**
 ```json
 {
   "id": 1,
@@ -648,54 +386,36 @@ List all active system users.
   "company": 1,
   "role": 2,
   "status": "pending",
-  "expires_at": "2026-03-01T00:00:00Z",
-  "created_at": "2026-02-17T10:00:00Z"
+  "expires_at": "2026-05-01T00:00:00Z"
 }
 ```
 
 ---
 
-### 4. Company — `/api/company/`
+### 4. Company — `/api/v1/company/`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/company/` | List companies |
-| POST | `/api/company/` | Create company |
-| GET | `/api/company/{id}/` | Get company details |
-| PUT | `/api/company/{id}/` | Update company |
-| PATCH | `/api/company/{id}/` | Partial update |
-| DELETE | `/api/company/{id}/` | Delete company (owner only) |
-| GET | `/api/company/{id}/settings/` | Get company settings |
-| PUT | `/api/company/{id}/settings/` | Update company settings |
+| GET/POST | `/api/v1/company/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/company/{id}/` | Detail / update / delete |
+| GET/PUT | `/api/v1/company/{id}/settings/` | Get / update settings |
 
 ---
 
-### 5. Audit — `/api/audit/`
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/audit/notifications/` | List notifications |
-| POST | `/api/audit/notifications/mark-read/` | Mark notifications as read |
-| GET | `/api/audit/activity-logs/` | List activity logs (admin) |
-| GET | `/api/audit/activity-logs/my/` | List my activity logs |
-| GET | `/api/audit/security-logs/` | List security logs |
-
----
-
-### 6. HRIS Core — `/api/hris/`
+### 5. HRIS Core — `/api/v1/hris/core/`
 
 #### Employees
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/hris/employees/` | List employees |
-| POST | `/api/hris/employees/` | Create employee |
-| GET | `/api/hris/employees/{id}/` | Get employee details |
-| PUT | `/api/hris/employees/{id}/` | Update employee |
-| PATCH | `/api/hris/employees/{id}/` | Partial update |
-| DELETE | `/api/hris/employees/{id}/` | Soft delete employee |
+| GET/POST | `/api/v1/hris/core/employees/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/core/employees/{id}/` | Detail / update / soft-delete |
+| GET/POST | `/api/v1/hris/core/employees/{id}/employments/` | List / create employment records |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/core/employees/{id}/employments/{eid}/` | Employment detail |
+| GET/POST | `/api/v1/hris/core/employees/{id}/attendances/` | List / create attendance |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/core/employees/{id}/attendances/{aid}/` | Attendance detail |
 
-**Employee Object:**
+**Employee object:**
 ```json
 {
   "id": 1,
@@ -703,19 +423,26 @@ List all active system users.
   "first_name": "Ahmed",
   "last_name": "Mohamed",
   "national_id": "1234567890",
-  "passport_number": "A12345678",
-  "nationality": "Saudi Arabian",
   "date_of_birth": "1990-01-15",
   "gender": "M",
   "marital_status": "M",
   "contact_number": "+966501234567",
   "personal_email": "ahmed@example.com",
   "company": 1,
-  "user": 1,
-  "location": 1,
   "department": 1,
-  "created_at": "2026-01-15T10:00:00Z",
-  "updated_at": "2026-01-15T10:00:00Z"
+  "location": 1
+}
+```
+
+**Attendance object:**
+```json
+{
+  "id": 1,
+  "employee": 1,
+  "date": "2026-04-08",
+  "check_in_time": "09:00:00",
+  "check_out_time": "17:00:00",
+  "status": "present"
 }
 ```
 
@@ -725,12 +452,17 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/hris/departments/` | List departments |
-| POST | `/api/hris/departments/` | Create department |
-| GET | `/api/hris/departments/{id}/` | Get department details |
-| PUT | `/api/hris/departments/{id}/` | Update department |
-| PATCH | `/api/hris/departments/{id}/` | Partial update |
-| DELETE | `/api/hris/departments/{id}/` | Soft delete department |
+| GET/POST | `/api/v1/hris/core/departments/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/core/departments/{id}/` | Detail / update / soft-delete |
+
+---
+
+#### Job Titles
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/v1/hris/core/job-titles/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/core/job-titles/{id}/` | Detail / update / soft-delete |
 
 ---
 
@@ -738,12 +470,8 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/hris/positions/` | List positions |
-| POST | `/api/hris/positions/` | Create position |
-| GET | `/api/hris/positions/{id}/` | Get position details |
-| PUT | `/api/hris/positions/{id}/` | Update position |
-| PATCH | `/api/hris/positions/{id}/` | Partial update |
-| DELETE | `/api/hris/positions/{id}/` | Soft delete position |
+| GET/POST | `/api/v1/hris/core/positions/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/core/positions/{id}/` | Detail / update / soft-delete |
 
 ---
 
@@ -751,40 +479,64 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/hris/locations/` | List locations |
-| POST | `/api/hris/locations/` | Create location |
-| GET | `/api/hris/locations/{id}/` | Get location details |
-| PUT | `/api/hris/locations/{id}/` | Update location |
-| PATCH | `/api/hris/locations/{id}/` | Partial update |
-| DELETE | `/api/hris/locations/{id}/` | Soft delete location |
+| GET/POST | `/api/v1/hris/core/locations/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/core/locations/{id}/` | Detail / update / soft-delete |
 
 ---
 
-#### Attendance
+### 6. Recruitment — `/api/v1/hris/recruitment/`
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/hris/attendance/` | List attendance records |
-| POST | `/api/hris/attendance/` | Create attendance record |
-| GET | `/api/hris/attendance/{id}/` | Get attendance details |
-| PUT | `/api/hris/attendance/{id}/` | Update attendance record |
-| PATCH | `/api/hris/attendance/{id}/` | Partial update |
-| DELETE | `/api/hris/attendance/{id}/` | Soft delete attendance record |
-
----
-
-### 7. Recruitment — `/api/hris/recruitment/`
+All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus custom actions.
 
 #### Hiring Requests
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/hris/recruitment/hiring-requests/` | List hiring requests |
-| POST | `/api/hris/recruitment/hiring-requests/` | Create hiring request |
-| GET | `/api/hris/recruitment/hiring-requests/{id}/` | Get hiring request details |
-| PUT | `/api/hris/recruitment/hiring-requests/{id}/` | Update hiring request |
-| PATCH | `/api/hris/recruitment/hiring-requests/{id}/` | Partial update |
-| DELETE | `/api/hris/recruitment/hiring-requests/{id}/` | Soft delete hiring request |
+| GET/POST | `/api/v1/hris/recruitment/hiring-requests/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/hiring-requests/{id}/` | Detail / update / delete |
+| POST | `/api/v1/hris/recruitment/hiring-requests/{id}/submit/` | Submit for approval |
+| POST | `/api/v1/hris/recruitment/hiring-requests/{id}/approve/` | Approve (with role_type) |
+
+**Object:**
+```json
+{
+  "id": 1,
+  "company": 1,
+  "department": 1,
+  "job_title": 1,
+  "vacancies": 2,
+  "purpose": "Expansion of engineering team",
+  "status": "draft",
+  "created_by": 1
+}
+```
+
+---
+
+#### Job Advertisements
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/v1/hris/recruitment/job-advertisements/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/job-advertisements/{id}/` | Detail / update / delete |
+| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/publish/` | Publish ad |
+| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/close/` | Close ad |
+
+**Object:**
+```json
+{
+  "id": 1,
+  "hiring_request": 1,
+  "title": "Senior Backend Engineer",
+  "description": "...",
+  "requirements": "...",
+  "skills": ["Python", "Django", "PostgreSQL"],
+  "responsibilities": "...",
+  "deadline": "2026-06-30",
+  "platforms": ["internal", "linkedin"],
+  "status": "draft"
+}
+```
 
 ---
 
@@ -792,12 +544,22 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/hris/recruitment/candidates/` | List candidates |
-| POST | `/api/hris/recruitment/candidates/` | Create candidate |
-| GET | `/api/hris/recruitment/candidates/{id}/` | Get candidate details |
-| PUT | `/api/hris/recruitment/candidates/{id}/` | Update candidate |
-| PATCH | `/api/hris/recruitment/candidates/{id}/` | Partial update |
-| DELETE | `/api/hris/recruitment/candidates/{id}/` | Soft delete candidate |
+| GET/POST | `/api/v1/hris/recruitment/candidates/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/candidates/{id}/` | Detail / update / delete |
+
+**Object:**
+```json
+{
+  "id": 1,
+  "first_name": "Sara",
+  "last_name": "Ali",
+  "email": "sara@example.com",
+  "phone": "+201234567890",
+  "linkedin_url": "https://linkedin.com/in/sara-ali",
+  "source": "LinkedIn",
+  "company": 1
+}
+```
 
 ---
 
@@ -805,12 +567,23 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/hris/recruitment/applications/` | List job applications |
-| POST | `/api/hris/recruitment/applications/` | Create job application |
-| GET | `/api/hris/recruitment/applications/{id}/` | Get application details |
-| PUT | `/api/hris/recruitment/applications/{id}/` | Update application |
-| PATCH | `/api/hris/recruitment/applications/{id}/` | Partial update |
-| DELETE | `/api/hris/recruitment/applications/{id}/` | Soft delete application |
+| GET/POST | `/api/v1/hris/recruitment/applications/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/applications/{id}/` | Detail / update / delete |
+| POST | `/api/v1/hris/recruitment/applications/{id}/move-to-stage/` | Advance pipeline stage |
+
+**Object:**
+```json
+{
+  "id": 1,
+  "candidate": 1,
+  "job_advertisement": 1,
+  "status": "applied",
+  "classification": "none",
+  "applied_at": "2026-04-08T10:00:00Z"
+}
+```
+
+**Stage values:** `applied` → `phone_screening` → `interview` → `offer` → `hired` / `rejected`
 
 ---
 
@@ -818,35 +591,125 @@ List all active system users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/hris/recruitment/interviews/` | List interviews |
-| POST | `/api/hris/recruitment/interviews/` | Create interview |
-| GET | `/api/hris/recruitment/interviews/{id}/` | Get interview details |
-| PUT | `/api/hris/recruitment/interviews/{id}/` | Update interview |
-| PATCH | `/api/hris/recruitment/interviews/{id}/` | Partial update |
-| DELETE | `/api/hris/recruitment/interviews/{id}/` | Soft delete interview |
+| GET/POST | `/api/v1/hris/recruitment/interviews/` | List / schedule |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/interviews/{id}/` | Detail / update / delete |
+| POST | `/api/v1/hris/recruitment/interviews/{id}/record-result/` | Record scoring |
+
+**Object:**
+```json
+{
+  "id": 1,
+  "application": 1,
+  "interview_type": "personal",
+  "interview_date": "2026-05-01T10:00:00Z",
+  "interviewers": [1, 2],
+  "status": "scheduled",
+  "average_score": 0.0,
+  "scoring_data": {}
+}
+```
+
+---
+
+#### Candidate Documents
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/v1/hris/recruitment/documents/` | List / upload |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/documents/{id}/` | Detail / update / delete |
+
+**doc_type values:** `id_copy`, `qualification`, `military_status`, `personal_photo`, `police_clearance`, `other`
+
+---
+
+#### Job Offers
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/v1/hris/recruitment/offers/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/offers/{id}/` | Detail / update / delete |
+| POST | `/api/v1/hris/recruitment/offers/{id}/accept/` | Accept offer → creates employee record |
+
+**Object:**
+```json
+{
+  "id": 1,
+  "application": 1,
+  "salary": "25000.00",
+  "allowance": "2000.00",
+  "benefits": "Health insurance, annual leave",
+  "start_date": "2026-06-01",
+  "status": "draft"
+}
+```
+
+---
+
+#### Onboarding
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/v1/hris/recruitment/onboarding/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/onboarding/{id}/` | Detail / update / delete |
+
+**Object:**
+```json
+{
+  "id": 1,
+  "candidate": 1,
+  "tasks": { "workspace_setup": false, "email_created": false, "id_badge": false },
+  "status": "not_started"
+}
+```
+
+---
+
+### 7. Audit — `/api/v1/audit/`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/audit/notifications/` | List my notifications |
+| POST | `/api/v1/audit/notifications/mark-read/` | Mark notifications as read |
+| GET | `/api/v1/audit/activity-logs/` | List all activity logs (admin) |
+| GET | `/api/v1/audit/activity-logs/my/` | List my activity logs |
+| GET | `/api/v1/audit/security-logs/` | List security audit logs (admin) |
+
+---
+
+## Utility Endpoints
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /` | None | API root — service name, version, links |
+| `GET /health/` | None | Liveness probe — status, timestamp |
+| `GET /swagger/` | None | Swagger UI |
+| `GET /redoc/` | None | ReDoc UI |
+| `GET /swagger.json` | None | OpenAPI schema (JSON) |
+| `GET /swagger.yaml` | None | OpenAPI schema (YAML) |
+| `GET /admin/` | Django session | Django admin panel |
+
+**Health response:**
+```json
+{
+  "status": "ok",
+  "service": "ouvira-backend",
+  "version": "v1",
+  "timestamp": "2026-04-08T10:00:00Z"
+}
+```
 
 ---
 
 ## Pagination
 
-All list endpoints support pagination with the following response format:
+All list endpoints return paginated responses.
 
-```json
-{
-  "count": 100,
-  "next": "http://api.ouvira.com/endpoint?page=2",
-  "previous": null,
-  "results": [...]
-}
+**Query parameters:**
+- `page` — page number (default: 1)
+- `page_size` — items per page (default: 20)
+
 ```
-
-**Query Parameters:**
-- `page` — Page number (default: 1)
-- `page_size` — Items per page (default: 20, max: 100)
-
-**Example:**
-```
-GET /api/hris/employees/?page=2&page_size=50
+GET /api/v1/hris/core/employees/?page=2&page_size=50
 ```
 
 ---
@@ -857,37 +720,14 @@ GET /api/hris/employees/?page=2&page_size=50
 |-------|-------|--------|
 | Anonymous | 200 | per day |
 | Authenticated | 1000 | per day |
-| Login | 5 | per minute |
-| OTP Verify | 5 | per minute |
-| 2FA Verify | 5 | per minute |
-| OTP Send | 1 | per minute |
-| Token Refresh | 20 | per minute |
-| Password Forgot | 3 | per hour |
-| Password Change | 10 | per hour |
-
-**Rate Limit Headers:**
-```
-X-RateLimit-Limit: 1000
-X-RateLimit-Remaining: 999
-X-RateLimit-Reset: 1647360000
-```
-
----
-
-## Security Considerations
-
-1. **Always use HTTPS in production**
-2. **Never share your SECRET_KEY or database credentials**
-3. **Rotate API tokens regularly**
-4. **Implement proper CORS settings for your frontend domain**
-5. **Use the X-Tenant header to route requests to the correct tenant**
-6. **Enable 2FA for all admin accounts**
-
----
-
-## Support
-
-For API support:
-- **Swagger UI**: `/swagger/`
-- **ReDoc**: `/redoc/`
-- **GitHub Issues**: [Report issues](https://github.com/EngHassanAshraf/ouvira-backend/issues)
+| `login` | 5 | per minute |
+| `otp_send` | 1 | per minute |
+| `otp_verify` | 5 | per minute |
+| `twofa_verify` | 5 | per minute |
+| `refresh` | 20 | per minute |
+| `signup` | 3 | per hour |
+| `finalize_signin` | 3 | per hour |
+| `otp_resend` | 3 | per hour |
+| `forgot_password` | 3 | per hour |
+| `enable_2fa` | 10 | per hour |
+| `password_change` | 10 | per hour |
