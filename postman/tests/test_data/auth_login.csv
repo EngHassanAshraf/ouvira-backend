@@ -1,0 +1,11 @@
+scenario,identifier,password,expected_status,expect_token
+happy_valid_username,root,Admin123!,200,true
+happy_valid_email,root@ouvira.com,Admin123!,200,true
+wrong_password,root,WrongPassword999!,400,false
+empty_identifier,,Admin123!,400,false
+empty_password,root,,400,false
+sql_injection_identifier,"' OR '1'='1'; --",anything,400,false
+xss_identifier,<script>alert(1)</script>,Admin123!,400,false
+very_long_identifier,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,Admin123!,400,false
+unicode_identifier,مستخدم@example.com,Admin123!,400,false
+null_password,root,,400,false

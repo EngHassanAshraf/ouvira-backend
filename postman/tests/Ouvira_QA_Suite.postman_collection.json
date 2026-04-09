@@ -1,0 +1,1089 @@
+{
+  "info": {
+    "_postman_id": "ouvira-qa-suite-v1",
+    "name": "Ouvira ERP — QA Test Suite",
+    "description": "Production-grade QA automation suite.\nCovers: functional, edge, security, boundary, and data-integrity tests.\n\n## How to run\n1. Import this collection + Ouvira_QA.postman_environment.json\n2. Single run: Postman Runner → select collection → select environment\n3. Data-driven: Postman Runner → select CSV/JSON from test_data/ folder\n4. CI: newman run Ouvira_QA_Suite.postman_collection.json -e Ouvira_QA.postman_environment.json --reporters cli,junit\n\n## Folder structure\n- 🔐 Auth Tests\n- 👤 Account Tests\n- 🏢 Company Tests\n- 🔑 Access Control Tests\n- 👥 HRIS Core Tests\n- 📋 Recruitment Tests\n- 🛡️ Security Tests (cross-cutting)\n- ⚡ Performance Hints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",          "value": "http://localhost:8000" },
+    { "key": "tenant",            "value": "shawahid" },
+    { "key": "access_token",      "value": "" },
+    { "key": "refresh_token",     "value": "" },
+    { "key": "admin_token",       "value": "" },
+    { "key": "session_id",        "value": "" },
+    { "key": "company_id",        "value": "1" },
+    { "key": "employee_id",       "value": "1" },
+    { "key": "department_id",     "value": "1" },
+    { "key": "job_title_id",      "value": "1" },
+    { "key": "hiring_request_id", "value": "1" },
+    { "key": "job_ad_id",         "value": "1" },
+    { "key": "candidate_id",      "value": "1" },
+    { "key": "application_id",    "value": "1" },
+    { "key": "interview_id",      "value": "1" },
+    { "key": "offer_id",          "value": "1" },
+    { "key": "invitation_id",     "value": "1" },
+    { "key": "role_id",           "value": "1" },
+    { "key": "response_time_threshold", "value": "2000" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "item": [
+
+    {
+      "name": "🔐 Auth Tests",
+      "item": [
+
+        {
+          "name": "[HAPPY] Login — valid credentials",
+          "event": [{
+            "listen": "prerequest",
+            "script": { "exec": ["// Ensure clean state", "pm.collectionVariables.set('access_token', '');"] }
+          },{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response time < threshold', () => pm.expect(pm.response.responseTime).to.be.below(parseInt(pm.collectionVariables.get('response_time_threshold'))));",
+              "const json = pm.response.json();",
+              "pm.test('Has access token', () => pm.expect(json).to.have.property('access'));",
+              "pm.test('Has refresh token', () => pm.expect(json).to.have.property('refresh'));",
+              "pm.test('2fa_required is boolean', () => pm.expect(json['2fa_required']).to.be.a('boolean'));",
+              "pm.test('expires_in is number', () => pm.expect(json.expires_in).to.be.a('number'));",
+              "pm.collectionVariables.set('access_token', json.access);",
+              "pm.collectionVariables.set('refresh_token', json.refresh);",
+              "console.log('✅ Tokens saved');"
+            ]}
+          }],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login/", "host": ["{{base_url}}"], "path": ["api","v1","auth","login",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"root\",\n  \"password\": \"Admin123!\",\n  \"remember_me\": false,\n  \"cf_turnstile_response\": \"{{turnstile_bypass}}\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Login — wrong password",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "const json = pm.response.json();",
+            "pm.test('Error message present', () => pm.expect(json).to.have.property('message'));",
+            "pm.test('No token leaked', () => { pm.expect(json).to.not.have.property('access'); pm.expect(json).to.not.have.property('refresh'); });"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login/", "host": ["{{base_url}}"], "path": ["api","v1","auth","login",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"root\",\n  \"password\": \"WrongPassword999!\",\n  \"cf_turnstile_response\": \"{{turnstile_bypass}}\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Login — empty identifier",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('No token in response', () => { const j = pm.response.json(); pm.expect(j).to.not.have.property('access'); });"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login/", "host": ["{{base_url}}"], "path": ["api","v1","auth","login",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"\",\n  \"password\": \"Admin123!\",\n  \"cf_turnstile_response\": \"{{turnstile_bypass}}\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Login — missing password field",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login/", "host": ["{{base_url}}"], "path": ["api","v1","auth","login",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"root\",\n  \"cf_turnstile_response\": \"{{turnstile_bypass}}\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Login — SQL injection in identifier",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (not 500)', () => pm.expect(pm.response.code).to.be.oneOf([400, 401]));",
+            "pm.test('No stack trace exposed', () => { const body = pm.response.text(); pm.expect(body).to.not.include('Traceback'); pm.expect(body).to.not.include('django.db'); });"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login/", "host": ["{{base_url}}"], "path": ["api","v1","auth","login",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"' OR '1'='1'; --\",\n  \"password\": \"anything\",\n  \"cf_turnstile_response\": \"{{turnstile_bypass}}\"\n}" }
+          }
+        },
+
+        {
+          "name": "[SECURITY] Login — XSS in identifier",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status not 500', () => pm.expect(pm.response.code).to.not.equal(500));",
+            "pm.test('Response does not reflect raw script tag', () => { pm.expect(pm.response.text()).to.not.include('<script>alert'); });"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login/", "host": ["{{base_url}}"], "path": ["api","v1","auth","login",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"<script>alert('xss')</script>\",\n  \"password\": \"Admin123!\",\n  \"cf_turnstile_response\": \"{{turnstile_bypass}}\"\n}" }
+          }
+        },
+
+        {
+          "name": "[BOUNDARY] Login — identifier 255 chars",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (not 500)', () => pm.expect(pm.response.code).to.not.equal(500));"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login/", "host": ["{{base_url}}"], "path": ["api","v1","auth","login",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"password\": \"Admin123!\",\n  \"cf_turnstile_response\": \"{{turnstile_bypass}}\"\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Token Refresh — valid token",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json();",
+            "pm.test('New access token returned', () => pm.expect(json.access).to.be.a('string').and.not.empty);",
+            "pm.collectionVariables.set('access_token', json.access);",
+            "if (json.refresh) pm.collectionVariables.set('refresh_token', json.refresh);"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/token/refresh/", "host": ["{{base_url}}"], "path": ["api","v1","auth","token","refresh",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Token Refresh — tampered token",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 or 401', () => pm.expect(pm.response.code).to.be.oneOf([400, 401]));",
+            "pm.test('No new access token', () => pm.expect(pm.response.json()).to.not.have.property('access'));"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/token/refresh/", "host": ["{{base_url}}"], "path": ["api","v1","auth","token","refresh",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refresh\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.TAMPERED.signature\"\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Password Change — valid",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Success flag true', () => pm.expect(pm.response.json().success).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/auth/password/change/", "host": ["{{base_url}}"], "path": ["api","v1","auth","password","change",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"old_password\": \"Admin123!\",\n  \"new_password\": \"Admin123!\",\n  \"confirm_password\": \"Admin123!\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Password Change — mismatch confirm",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('password_mismatch error', () => pm.expect(pm.response.json().error).to.equal('password_mismatch'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/auth/password/change/", "host": ["{{base_url}}"], "path": ["api","v1","auth","password","change",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"old_password\": \"Admin123!\",\n  \"new_password\": \"NewPass123!\",\n  \"confirm_password\": \"DifferentPass456!\"\n}" }
+          }
+        },
+
+        {
+          "name": "[SECURITY] Password Change — no auth token",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/password/change/", "host": ["{{base_url}}"], "path": ["api","v1","auth","password","change",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"old_password\": \"Admin123!\",\n  \"new_password\": \"NewPass123!\",\n  \"confirm_password\": \"NewPass123!\"\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] OTP Send — valid identifier",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('detail field present', () => pm.expect(pm.response.json()).to.have.property('detail'));"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/otp/send/", "host": ["{{base_url}}"], "path": ["api","v1","auth","otp","send",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"root@ouvira.com\",\n  \"cf_turnstile_response\": \"{{turnstile_bypass}}\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] OTP Send — non-existent identifier (must still 200 — enumeration guard)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 (no enumeration)', () => pm.response.to.have.status(200));",
+            "pm.test('Generic message returned', () => pm.expect(pm.response.json().detail).to.include('registered'));"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/otp/send/", "host": ["{{base_url}}"], "path": ["api","v1","auth","otp","send",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"ghost_user_does_not_exist_xyz@nowhere.com\",\n  \"cf_turnstile_response\": \"{{turnstile_bypass}}\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] OTP Verify — wrong 6-digit code",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/otp/verify/", "host": ["{{base_url}}"], "path": ["api","v1","auth","otp","verify",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"root@ouvira.com\",\n  \"otp\": \"000000\"\n}" }
+          }
+        },
+
+        {
+          "name": "[BOUNDARY] OTP Verify — 5-digit code (too short)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 — validation error', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/otp/verify/", "host": ["{{base_url}}"], "path": ["api","v1","auth","otp","verify",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"root@ouvira.com\",\n  \"otp\": \"12345\"\n}" }
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "👥 HRIS Core Tests",
+      "item": [
+
+        {
+          "name": "[HAPPY] Create Department — valid Arabic+English name",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Response time OK', () => pm.expect(pm.response.responseTime).to.be.below(parseInt(pm.collectionVariables.get('response_time_threshold'))));",
+            "const json = pm.response.json();",
+            "pm.test('Has id', () => pm.expect(json.id).to.be.a('number'));",
+            "pm.test('Name matches', () => pm.expect(json.name).to.equal('Engineering — هندسة'));",
+            "pm.collectionVariables.set('department_id', json.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Engineering — هندسة\"\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Create Department — Arabic only",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Arabic name stored correctly', () => pm.expect(pm.response.json().name).to.equal('الموارد البشرية'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"الموارد البشرية\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Department — empty name",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('name error present', () => pm.expect(pm.response.json()).to.have.property('name'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"\"\n}" }
+          }
+        },
+
+        {
+          "name": "[BOUNDARY] Create Department — name 255 chars (max)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 (max length accepted)', () => pm.response.to.have.status(201));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n}" }
+          }
+        },
+
+        {
+          "name": "[BOUNDARY] Create Department — name 256 chars (over max)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (over max length)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Create Employee — valid KSA national ID",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const json = pm.response.json();",
+            "pm.test('employee_id matches', () => pm.expect(json.employee_id).to.equal('EMP-QA-001'));",
+            "pm.collectionVariables.set('employee_id', json.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"employee_id\": \"EMP-QA-001\",\n  \"first_name\": \"Ahmed\",\n  \"last_name\": \"Al-Rashidi\",\n  \"national_id\": \"1098765432\",\n  \"nationality\": \"Saudi Arabian\",\n  \"gender\": \"M\",\n  \"marital_status\": \"S\",\n  \"contact_number\": \"+966501234567\",\n  \"personal_email\": \"ahmed.alrashidi@example.com\",\n  \"location\": 1,\n  \"department\": {{department_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Employee — national_id 9 digits (too short)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('national_id error', () => { const j = pm.response.json(); pm.expect(JSON.stringify(j)).to.include('10 digits'); });"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"employee_id\": \"EMP-QA-BAD\",\n  \"first_name\": \"Bad\",\n  \"last_name\": \"Employee\",\n  \"national_id\": \"123456789\",\n  \"location\": 1,\n  \"department\": {{department_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Employee — national_id with letters",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('digits-only error', () => pm.expect(JSON.stringify(pm.response.json())).to.include('digits'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"employee_id\": \"EMP-QA-BAD2\",\n  \"first_name\": \"Bad\",\n  \"last_name\": \"Employee\",\n  \"national_id\": \"ABC1234567\",\n  \"location\": 1,\n  \"department\": {{department_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Employee — duplicate national_id",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (unique constraint)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"employee_id\": \"EMP-QA-DUP\",\n  \"first_name\": \"Duplicate\",\n  \"last_name\": \"Employee\",\n  \"national_id\": \"1098765432\",\n  \"location\": 1,\n  \"department\": {{department_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[SECURITY] Create Employee — no auth token",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"employee_id\": \"EMP-UNAUTH\",\n  \"first_name\": \"Hacker\",\n  \"last_name\": \"Attempt\",\n  \"national_id\": \"9999999999\"\n}" }
+          }
+        },
+
+        {
+          "name": "[SECURITY] Get Employee — IDOR attempt (cross-tenant ID)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 404 or 403 (not 200)', () => pm.expect(pm.response.code).to.be.oneOf([403, 404]));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/99999/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","99999",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          }
+        },
+
+        {
+          "name": "[HAPPY] List Employees — pagination",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json();",
+            "pm.test('Has count field', () => pm.expect(json).to.have.property('count'));",
+            "pm.test('Has results array', () => pm.expect(json.results).to.be.an('array'));",
+            "pm.test('Page size respected', () => pm.expect(json.results.length).to.be.at.most(2));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/?page=1&page_size=2", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""], "query": [{ "key": "page", "value": "1" }, { "key": "page_size", "value": "2" }] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          }
+        },
+
+        {
+          "name": "[EDGE] Create Employee — Unicode special chars in name",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status not 500', () => pm.expect(pm.response.code).to.not.equal(500));",
+            "pm.test('Response time OK', () => pm.expect(pm.response.responseTime).to.be.below(parseInt(pm.collectionVariables.get('response_time_threshold'))));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"employee_id\": \"EMP-UNICODE-01\",\n  \"first_name\": \"محمد\",\n  \"last_name\": \"O'Brien-Müller\",\n  \"national_id\": \"1122334455\",\n  \"location\": 1,\n  \"department\": {{department_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Create Attendance — valid check-in",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const json = pm.response.json();",
+            "pm.test('Status is present', () => pm.expect(json.status).to.equal('present'));",
+            "pm.test('check_in_time stored', () => pm.expect(json.check_in_time).to.equal('09:00:00'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/attendances/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}","attendances",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"date\": \"2026-04-10\",\n  \"check_in_time\": \"09:00:00\",\n  \"status\": \"present\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Attendance — duplicate date (unique_together)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (duplicate date)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/{{employee_id}}/attendances/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees","{{employee_id}}","attendances",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"date\": \"2026-04-10\",\n  \"check_in_time\": \"10:00:00\",\n  \"status\": \"present\"\n}" }
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "📋 Recruitment Tests",
+      "item": [
+
+        {
+          "name": "[HAPPY] Create Hiring Request — valid",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const json = pm.response.json();",
+            "pm.test('Status is draft', () => pm.expect(json.status).to.equal('draft'));",
+            "pm.test('vacancies is 3', () => pm.expect(json.vacancies).to.equal(3));",
+            "pm.collectionVariables.set('hiring_request_id', json.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"company\": {{company_id}},\n  \"job_title\": {{job_title_id}},\n  \"department\": {{department_id}},\n  \"vacancies\": 3,\n  \"purpose\": \"Q2 2026 engineering expansion — backend team growth\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Hiring Request — vacancies = 0",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (vacancies must be positive)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"company\": {{company_id}},\n  \"job_title\": {{job_title_id}},\n  \"department\": {{department_id}},\n  \"vacancies\": 0,\n  \"purpose\": \"Zero vacancies test\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Hiring Request — missing purpose",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('purpose error', () => pm.expect(pm.response.json()).to.have.property('purpose'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"company\": {{company_id}},\n  \"job_title\": {{job_title_id}},\n  \"department\": {{department_id}},\n  \"vacancies\": 1\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Hiring Request — non-existent job_title FK",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (invalid FK)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"company\": {{company_id}},\n  \"job_title\": 999999,\n  \"department\": {{department_id}},\n  \"vacancies\": 1,\n  \"purpose\": \"Invalid FK test\"\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Submit Hiring Request",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Status changed to submitted', () => pm.expect(pm.response.json().status).to.equal('submitted'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/submit/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","{{hiring_request_id}}","submit",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Submit Hiring Request — already submitted (double submit)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (invalid state transition)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/submit/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","{{hiring_request_id}}","submit",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Approve Hiring Request — employee role",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/approve/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","{{hiring_request_id}}","approve",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role_type\": \"employee\",\n  \"note\": \"Approved — team needs the headcount\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Approve Hiring Request — missing role_type",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('role_type required error', () => pm.expect(pm.response.json().detail).to.include('role_type'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/approve/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","{{hiring_request_id}}","approve",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"note\": \"Forgot role_type\"\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Create Candidate — valid",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const json = pm.response.json();",
+            "pm.test('email stored lowercase', () => pm.expect(json.email).to.equal('sara.qa@example.com'));",
+            "pm.collectionVariables.set('candidate_id', json.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"first_name\": \"Sara\",\n  \"last_name\": \"Al-Qahtani\",\n  \"email\": \"sara.qa@example.com\",\n  \"phone\": \"+966501234567\",\n  \"linkedin_url\": \"https://linkedin.com/in/sara-alqahtani\",\n  \"source\": \"LinkedIn\",\n  \"company\": {{company_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Candidate — invalid email format",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('email error', () => pm.expect(pm.response.json()).to.have.property('email'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"first_name\": \"Bad\",\n  \"last_name\": \"Email\",\n  \"email\": \"not-an-email\",\n  \"company\": {{company_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Candidate — duplicate email",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (unique email)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"first_name\": \"Duplicate\",\n  \"last_name\": \"Candidate\",\n  \"email\": \"sara.qa@example.com\",\n  \"company\": {{company_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[EDGE] Create Candidate — Arabic name + emoji in source",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status not 500', () => pm.expect(pm.response.code).to.not.equal(500));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"first_name\": \"فاطمة\",\n  \"last_name\": \"الزهراء\",\n  \"email\": \"fatima.zahraa.unique99@example.com\",\n  \"source\": \"LinkedIn 🔗\",\n  \"company\": {{company_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Create Job Application — valid",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const json = pm.response.json();",
+            "pm.test('Status is applied', () => pm.expect(json.status).to.equal('applied'));",
+            "pm.collectionVariables.set('application_id', json.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"candidate\": {{candidate_id}},\n  \"job_advertisement\": {{job_ad_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Application — duplicate (same candidate + same ad)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (unique_together violation)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"candidate\": {{candidate_id}},\n  \"job_advertisement\": {{job_ad_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Move Application to Interview",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Status is interview', () => pm.expect(pm.response.json().status).to.equal('interview'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/{{application_id}}/move-to-stage/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications","{{application_id}}","move-to-stage",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"interview\",\n  \"classification\": \"shortlist_1\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Move Application — invalid status value",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/applications/{{application_id}}/move-to-stage/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","applications","{{application_id}}","move-to-stage",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"flying_to_moon\"\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Schedule Interview — valid",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const json = pm.response.json();",
+            "pm.test('Status is scheduled', () => pm.expect(json.status).to.equal('scheduled'));",
+            "pm.test('interview_type is personal', () => pm.expect(json.interview_type).to.equal('personal'));",
+            "pm.collectionVariables.set('interview_id', json.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/interviews/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","interviews",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"application\": {{application_id}},\n  \"interview_type\": \"personal\",\n  \"interview_date\": \"2026-06-01T10:00:00Z\",\n  \"interviewers\": [1]\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Schedule Interview — past date",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (past date)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/interviews/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","interviews",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"application\": {{application_id}},\n  \"interview_type\": \"phone\",\n  \"interview_date\": \"2020-01-01T10:00:00Z\",\n  \"interviewers\": [1]\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Schedule Interview — invalid interview_type",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/interviews/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","interviews",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"application\": {{application_id}},\n  \"interview_type\": \"technical\",\n  \"interview_date\": \"2026-06-01T10:00:00Z\",\n  \"interviewers\": [1]\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Record Interview Result — valid scoring",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json();",
+            "pm.test('average_score is number', () => pm.expect(json.average_score).to.be.a('number'));",
+            "pm.test('Status is completed', () => pm.expect(json.status).to.equal('completed'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/interviews/{{interview_id}}/record-result/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","interviews","{{interview_id}}","record-result",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"scoring_data\": {\n    \"technical_skills\": 8,\n    \"communication\": 9,\n    \"problem_solving\": 7,\n    \"culture_fit\": 9\n  },\n  \"note\": \"Strong candidate — recommend offer\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Record Interview Result — missing scoring_data",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('scoring_data required', () => pm.expect(pm.response.json().detail).to.include('scoring_data'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/interviews/{{interview_id}}/record-result/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","interviews","{{interview_id}}","record-result",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"note\": \"Forgot scoring_data\"\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Create Job Offer — valid",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const json = pm.response.json();",
+            "pm.test('Status is draft', () => pm.expect(json.status).to.equal('draft'));",
+            "pm.test('salary is string decimal', () => pm.expect(json.salary).to.be.a('string'));",
+            "pm.collectionVariables.set('offer_id', json.id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/offers/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","offers",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"application\": {{application_id}},\n  \"salary\": \"28000.00\",\n  \"allowance\": \"3500.00\",\n  \"benefits\": \"Medical insurance, 21 days annual leave, remote Thursdays\",\n  \"start_date\": \"2026-07-01\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Job Offer — negative salary",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (negative salary)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/offers/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","offers",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"application\": {{application_id}},\n  \"salary\": \"-5000.00\",\n  \"start_date\": \"2026-07-01\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Create Job Offer — duplicate (OneToOne violation)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 (one offer per application)', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/offers/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","offers",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"application\": {{application_id}},\n  \"salary\": \"30000.00\",\n  \"start_date\": \"2026-08-01\"\n}" }
+          }
+        },
+
+        {
+          "name": "[HAPPY] Accept Offer — creates Employee record",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Offer status accepted', () => pm.expect(pm.response.json().status).to.equal('accepted'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/offers/{{offer_id}}/accept/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","offers","{{offer_id}}","accept",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"employee_id\": \"EMP-2026-QA-01\",\n  \"national_id\": \"2098765432\",\n  \"gender\": \"F\",\n  \"date_of_birth\": \"1997-05-20\"\n}" }
+          }
+        },
+
+        {
+          "name": "[NEGATIVE] Accept Offer — missing employee_id",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('Missing fields error', () => pm.expect(pm.response.json().detail).to.include('employee_id'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/offers/{{offer_id}}/accept/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","offers","{{offer_id}}","accept",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"national_id\": \"2098765432\"\n}" }
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "🛡️ Security Tests",
+      "description": "Cross-cutting security tests: auth bypass, IDOR, mass assignment, injection, role violations.",
+      "item": [
+
+        {
+          "name": "[SECURITY] Any endpoint — expired/fake JWT",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 401', () => pm.response.to.have.status(401));",
+            "pm.test('No data leaked', () => { const j = pm.response.json(); pm.expect(j).to.not.have.property('results'); });"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJleHAiOjE2MDAwMDAwMDB9.FAKE_SIGNATURE", "type": "string" }] },
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          }
+        },
+
+        {
+          "name": "[SECURITY] Any endpoint — no token at all",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "method": "GET", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          }
+        },
+
+        {
+          "name": "[SECURITY] IDOR — access hiring request with arbitrary ID",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 403 or 404 (not 200)', () => pm.expect(pm.response.code).to.be.oneOf([403, 404]));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/99999/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests","99999",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          }
+        },
+
+        {
+          "name": "[SECURITY] Mass Assignment — attempt to set status directly on create",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 400', () => pm.expect(pm.response.code).to.be.oneOf([201, 400]));",
+            "if (pm.response.code === 201) {",
+            "  pm.test('Status NOT approved (mass assignment blocked)', () => pm.expect(pm.response.json().status).to.not.equal('approved'));",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","hiring-requests",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"company\": {{company_id}},\n  \"job_title\": {{job_title_id}},\n  \"department\": {{department_id}},\n  \"vacancies\": 1,\n  \"purpose\": \"Mass assignment test\",\n  \"status\": \"approved\",\n  \"created_by\": 1\n}" }
+          }
+        },
+
+        {
+          "name": "[SECURITY] Mass Assignment — attempt to set is_deleted=false on create",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status not 500', () => pm.expect(pm.response.code).to.not.equal(500));",
+            "if (pm.response.code === 201) {",
+            "  pm.test('is_deleted not in response or false', () => {",
+            "    const j = pm.response.json();",
+            "    if (j.is_deleted !== undefined) pm.expect(j.is_deleted).to.be.false;",
+            "  });",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/departments/", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","departments",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Mass Assignment Dept\",\n  \"is_deleted\": true,\n  \"deleted_at\": \"2020-01-01T00:00:00Z\"\n}" }
+          }
+        },
+
+        {
+          "name": "[SECURITY] SQL Injection — in query param",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status not 500', () => pm.expect(pm.response.code).to.not.equal(500));",
+            "pm.test('No stack trace', () => pm.expect(pm.response.text()).to.not.include('Traceback'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/?company=1 OR 1=1; DROP TABLE hris_recruitment_candidates; --", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates",""], "query": [{ "key": "company", "value": "1 OR 1=1; DROP TABLE hris_recruitment_candidates; --" }] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          }
+        },
+
+        {
+          "name": "[SECURITY] XSS — in candidate first_name",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status not 500', () => pm.expect(pm.response.code).to.not.equal(500));",
+            "pm.test('Script tag not reflected unescaped in JSON', () => {",
+            "  const body = pm.response.text();",
+            "  pm.expect(body).to.not.include('<script>alert');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"first_name\": \"<script>alert('xss')</script>\",\n  \"last_name\": \"XSSTest\",\n  \"email\": \"xss.test.unique@example.com\",\n  \"company\": {{company_id}}\n}" }
+          }
+        },
+
+        {
+          "name": "[SECURITY] Role Violation — non-admin tries to create permission",
+          "event": [{
+            "listen": "prerequest",
+            "script": { "exec": [
+              "// This test uses the regular user token (not admin_token)",
+              "// If you have a non-admin token, set it here:",
+              "// pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + pm.collectionVariables.get('non_admin_token') });"
+            ]}
+          },{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 403 (non-admin blocked)', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/access-control/permissions/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","permissions",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"hris.god_mode\",\n  \"module\": \"HRIS\",\n  \"description\": \"Unauthorized permission creation attempt\"\n}" }
+          }
+        },
+
+        {
+          "name": "[SECURITY] Invitation Accept — unauthenticated user",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 403 (auth required)', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/access-control/invitations/accept/", "host": ["{{base_url}}"], "path": ["api","v1","access-control","invitations","accept",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"FAKE_INVITATION_TOKEN_12345\"\n}" }
+          }
+        },
+
+        {
+          "name": "[SECURITY] Health endpoint — no auth needed (public)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 (public endpoint)', () => pm.response.to.have.status(200));",
+            "pm.test('No sensitive data in health response', () => {",
+            "  const j = pm.response.json();",
+            "  pm.expect(j).to.not.have.property('SECRET_KEY');",
+            "  pm.expect(j).to.not.have.property('database');",
+            "  pm.expect(j).to.not.have.property('password');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/health/", "host": ["{{base_url}}"], "path": ["health",""] },
+            "header": []
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "⚡ Performance Hints",
+      "description": "These tests assert response time thresholds. Adjust {{response_time_threshold}} (ms) per environment.\nFor load testing, export these to k6 or Locust.",
+      "item": [
+
+        {
+          "name": "[PERF] List Employees — under threshold",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response under ' + pm.collectionVariables.get('response_time_threshold') + 'ms', () => {",
+            "  pm.expect(pm.response.responseTime).to.be.below(parseInt(pm.collectionVariables.get('response_time_threshold')));",
+            "});",
+            "console.log('⏱ Response time:', pm.response.responseTime + 'ms');"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/hris/core/employees/?page=1&page_size=20", "host": ["{{base_url}}"], "path": ["api","v1","hris","core","employees",""], "query": [{ "key": "page", "value": "1" }, { "key": "page_size", "value": "20" }] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          }
+        },
+
+        {
+          "name": "[PERF] List Recruitment Candidates — under threshold",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response under threshold', () => pm.expect(pm.response.responseTime).to.be.below(parseInt(pm.collectionVariables.get('response_time_threshold'))));",
+            "console.log('⏱ Response time:', pm.response.responseTime + 'ms');"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/hris/recruitment/candidates/?company={{company_id}}&page=1&page_size=20", "host": ["{{base_url}}"], "path": ["api","v1","hris","recruitment","candidates",""], "query": [{ "key": "company", "value": "{{company_id}}" }, { "key": "page", "value": "1" }, { "key": "page_size", "value": "20" }] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }]
+          }
+        },
+
+        {
+          "name": "[PERF] Login endpoint — under 1000ms",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Login under 1000ms', () => pm.expect(pm.response.responseTime).to.be.below(1000));",
+            "console.log('⏱ Login time:', pm.response.responseTime + 'ms');"
+          ]}}],
+          "request": {
+            "method": "POST", "auth": { "type": "noauth" },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login/", "host": ["{{base_url}}"], "path": ["api","v1","auth","login",""] },
+            "header": [{ "key": "X-Tenant", "value": "{{tenant}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"root\",\n  \"password\": \"Admin123!\",\n  \"cf_turnstile_response\": \"{{turnstile_bypass}}\"\n}" }
+          }
+        }
+
+      ]
+    }
+
+  ]
+}

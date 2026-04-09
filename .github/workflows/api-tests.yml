@@ -1,0 +1,164 @@
+name: API Test Suite (Newman)
+
+on:
+  push:
+    branches: [main, develop, "feature/**"]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Nightly regression run at 02:00 UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "local"
+        type: choice
+        options: [local, staging]
+
+jobs:
+  api-tests:
+    name: Newman API Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: test_ouvira
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+
+    env:
+      SECRET_KEY: ci-test-secret-key-for-newman
+      DEBUG: "True"
+      TEST_MODE: "True"
+      POSTGRES_DB: test_ouvira
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: redis://localhost:6379/0
+      DJANGO_SETTINGS_MODULE: config.settings.local
+      TENANT_BASE_DOMAIN: localhost
+      TURNSTILE_BYPASS_TOKEN: kJ8mP2xQnR5vY9wL3tA6bN1cE4hG7fD0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run migrations + seed test tenant
+        working-directory: backend
+        run: |
+          python manage.py migrate --settings=config.settings.local
+          python manage.py shell -c "
+          from apps.tenant.models import Tenant, Domain
+          t, _ = Tenant.objects.get_or_create(schema_name='shawahid', defaults={'name': 'Shawahid CI'})
+          Domain.objects.get_or_create(domain='shawahid.localhost', defaults={'tenant': t, 'is_primary': True})
+          print('Tenant ready:', t.schema_name)
+          "
+
+      - name: Create superuser for tests
+        working-directory: backend
+        run: |
+          python manage.py shell -c "
+          from django_tenants.utils import schema_context
+          with schema_context('public'):
+              from django.contrib.auth import get_user_model
+              User = get_user_model()
+              if not User.objects.filter(username='root').exists():
+                  u = User.objects.create_superuser('root', 'root@ouvira.com', 'Admin123!')
+                  u.is_active = True
+                  u.phone_verified = True
+                  u.email_verified = True
+                  u.primary_mobile = '+201016746713'
+                  u.full_name = 'Root Admin'
+                  u.save()
+                  print('Superuser created')
+              else:
+                  print('Superuser exists')
+          "
+
+      - name: Start Django dev server
+        working-directory: backend
+        run: |
+          python manage.py runserver 0.0.0.0:8000 &
+          echo "Waiting for server..."
+          sleep 5
+          curl -f http://localhost:8000/health/ || exit 1
+          echo "Server is up"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Newman + reporters
+        run: npm install -g newman newman-reporter-htmlextra newman-reporter-junit
+
+      - name: Patch environment for CI base_url
+        run: |
+          python -c "
+          import json
+          with open('postman/tests/Ouvira_QA.postman_environment.json') as f:
+              env = json.load(f)
+          for v in env['values']:
+              if v['key'] == 'base_url':
+                  v['value'] = 'http://localhost:8000'
+              if v['key'] == 'tenant':
+                  v['value'] = 'shawahid'
+              if v['key'] == 'turnstile_bypass':
+                  v['value'] = 'kJ8mP2xQnR5vY9wL3tA6bN1cE4hG7fD0'
+          with open('postman/tests/Ouvira_QA.postman_environment.json', 'w') as f:
+              json.dump(env, f, indent=2)
+          print('Environment patched for CI')
+          "
+
+      - name: Run Newman QA Suite
+        run: |
+          newman run postman/tests/Ouvira_QA_Suite.postman_collection.json \
+            --environment postman/tests/Ouvira_QA.postman_environment.json \
+            --reporters cli,junit,htmlextra \
+            --reporter-junit-export newman-results/junit.xml \
+            --reporter-htmlextra-export newman-results/report.html \
+            --reporter-htmlextra-title "Ouvira API QA Report" \
+            --delay-request 100 \
+            --timeout-request 10000 \
+            --bail
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-test-results
+          path: newman-results/
+          retention-days: 30
+
+      - name: Publish JUnit results
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: "newman-results/junit.xml"
+          check_name: "Newman API Tests"
+          fail_on_failure: true

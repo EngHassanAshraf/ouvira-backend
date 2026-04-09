@@ -1,0 +1,73 @@
+[
+  {
+    "scenario": "happy_path_standard",
+    "vacancies": 2,
+    "purpose": "Q2 2026 engineering expansion — backend team growth for new product line",
+    "expected_status": 201,
+    "expected_state": "draft"
+  },
+  {
+    "scenario": "happy_path_arabic_purpose",
+    "vacancies": 1,
+    "purpose": "توسعة فريق الموارد البشرية لدعم النمو المؤسسي في الربع الثالث",
+    "expected_status": 201,
+    "expected_state": "draft"
+  },
+  {
+    "scenario": "happy_path_large_vacancies",
+    "vacancies": 50,
+    "purpose": "Mass hiring for new regional office opening in Riyadh",
+    "expected_status": 201,
+    "expected_state": "draft"
+  },
+  {
+    "scenario": "boundary_vacancies_1",
+    "vacancies": 1,
+    "purpose": "Single vacancy — minimum boundary test",
+    "expected_status": 201,
+    "expected_state": "draft"
+  },
+  {
+    "scenario": "invalid_vacancies_zero",
+    "vacancies": 0,
+    "purpose": "Zero vacancies — should fail",
+    "expected_status": 400,
+    "expected_state": null
+  },
+  {
+    "scenario": "invalid_vacancies_negative",
+    "vacancies": -5,
+    "purpose": "Negative vacancies — should fail",
+    "expected_status": 400,
+    "expected_state": null
+  },
+  {
+    "scenario": "missing_purpose",
+    "vacancies": 2,
+    "purpose": "",
+    "expected_status": 400,
+    "expected_state": null
+  },
+  {
+    "scenario": "mass_assignment_status_approved",
+    "vacancies": 1,
+    "purpose": "Mass assignment attempt — status should remain draft",
+    "status_override": "approved",
+    "expected_status": 201,
+    "expected_state": "draft"
+  },
+  {
+    "scenario": "xss_in_purpose",
+    "vacancies": 1,
+    "purpose": "<img src=x onerror=alert('xss')> New hire needed",
+    "expected_status": 201,
+    "expected_state": "draft"
+  },
+  {
+    "scenario": "extremely_long_purpose",
+    "vacancies": 1,
+    "purpose": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt neque porro quisquam est qui dolorem ipsum quia dolor sit amet consectetur adipisci velit sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.",
+    "expected_status": 201,
+    "expected_state": "draft"
+  }
+]
