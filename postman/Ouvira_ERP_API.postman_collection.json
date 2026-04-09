@@ -7,7 +7,7 @@
   },
   "variable": [
     { "key": "base_url", "value": "http://localhost:8000", "type": "string" },
-    { "key": "tenant", "value": "demo", "type": "string" },
+    { "key": "tenant", "value": "shawahid", "type": "string" },
     { "key": "access_token", "value": "", "type": "string" },
     { "key": "refresh_token", "value": "", "type": "string" },
     { "key": "session_id", "value": "", "type": "string" },
