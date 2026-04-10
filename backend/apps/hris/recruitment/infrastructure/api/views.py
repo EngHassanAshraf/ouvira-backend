@@ -4,8 +4,10 @@ from rest_framework.response import Response
 
 from .serializers import (
     HiringRequestSerializer,
+    HiringRequestUpdateSerializer,
     HiringRequestApprovalSerializer,
     JobAdvertisementSerializer,
+    JobAdvertisementUpdateSerializer,
     CandidateSerializer,
     JobApplicationSerializer,
     InterviewSerializer,
@@ -13,7 +15,6 @@ from .serializers import (
     JobOfferSerializer,
     OnboardingSerializer,
 )
-
 from ...models import (
     HiringRequest,
     HiringRequestApproval,
@@ -43,7 +44,7 @@ from ...infrastructure.persistence.selectors import (
 
 
 def _company_id(request):
-    """Helper: resolve company_id from query param or tenant."""
+    """Resolve company_id from query param → user attribute → tenant."""
     return (
         request.query_params.get("company")
         or getattr(request.user, "company_id", None)
@@ -54,17 +55,35 @@ def _company_id(request):
 # ─── Hiring Request ────────────────────────────────────────────────────────────
 
 class HiringRequestViewSet(viewsets.ModelViewSet):
-    """Full CRUD + workflow actions for Hiring Requests."""
-    serializer_class = HiringRequestSerializer
+    """
+    Full CRUD + workflow actions for Hiring Requests.
+
+    Lifecycle:
+      draft → [submit] → submitted → [approve/reject] → approved | rejected
+      draft | submitted → [cancel] → rejected (terminal)
+
+    Edit rules (enforced by service):
+      - PUT/PATCH: only allowed on DRAFT requests.
+      - DELETE:    only allowed on DRAFT requests (soft delete).
+    """
     queryset = HiringRequest.objects.all()
+
+    def get_serializer_class(self):
+        if self.action in ("update", "partial_update"):
+            return HiringRequestUpdateSerializer
+        return HiringRequestSerializer
 
     def get_queryset(self):
         cid = _company_id(self.request)
         if cid:
             return get_hiring_requests_for_company(cid)
-        return super().get_queryset().select_related(
-            "job_title", "department", "created_by"
-        ).prefetch_related("approvals")
+        return (
+            super().get_queryset()
+            .select_related("job_title", "department", "created_by")
+            .prefetch_related("approvals")
+        )
+
+    # ── Create ──────────────────────────────────────────────────────────────────
 
     def perform_create(self, serializer):
         serializer.instance = HiringRequestService.create_hiring_request(
@@ -73,29 +92,76 @@ class HiringRequestViewSet(viewsets.ModelViewSet):
             data=serializer.validated_data,
         )
 
+    # ── Update (PUT / PATCH) ────────────────────────────────────────────────────
+
+    def perform_update(self, serializer):
+        """Route updates through the service to enforce state guards + audit log."""
+        try:
+            serializer.instance = HiringRequestService.update_hiring_request(
+                request_id=self.get_object().pk,
+                user=self.request.user,
+                data=serializer.validated_data,
+            )
+        except ValueError as e:
+            raise serializer.ValidationError({"detail": str(e)})
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.instance = HiringRequestService.update_hiring_request(
+                request_id=instance.pk,
+                user=request.user,
+                data=serializer.validated_data,
+            )
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        # Return full representation using the read serializer
+        return Response(HiringRequestSerializer(serializer.instance).data)
+
+    # ── Delete ──────────────────────────────────────────────────────────────────
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            HiringRequestService.soft_delete_hiring_request(
+                request_id=instance.pk,
+                user=request.user,
+            )
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ── Workflow actions ─────────────────────────────────────────────────────────
+
     @action(detail=True, methods=["post"], url_path="submit")
     def submit(self, request, pk=None):
+        """Submit a draft request for approval."""
         try:
             obj = HiringRequestService.submit_hiring_request(pk, request.user)
-            return Response(self.get_serializer(obj).data)
+            return Response(HiringRequestSerializer(obj).data)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
+        """Approve one step in the approval chain."""
         role_type = request.data.get("role_type")
         if not role_type:
             return Response({"detail": "role_type is required."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             obj = HiringRequestService.approve_request(
-                pk, request.user, role_type, request.data.get("note", "")
+                int(pk), request.user, role_type, request.data.get("note", "")
             )
-            return Response(self.get_serializer(obj).data)
+            return Response(HiringRequestSerializer(obj).data)
         except (ValueError, HiringRequestApproval.DoesNotExist) as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):
+        """Reject the request at any approval step."""
         role_type = request.data.get("role_type")
         reason = request.data.get("reason")
         if not role_type or not reason:
@@ -105,40 +171,125 @@ class HiringRequestViewSet(viewsets.ModelViewSet):
             )
         try:
             obj = HiringRequestService.reject_request(pk, request.user, role_type, reason)
-            return Response(self.get_serializer(obj).data)
+            return Response(HiringRequestSerializer(obj).data)
         except (ValueError, HiringRequestApproval.DoesNotExist) as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel(self, request, pk=None):
+        """
+        Cancel a draft or submitted request.
+
+        Body (optional):
+          { "reason": "string" }
+        """
+        try:
+            obj = HiringRequestService.cancel_hiring_request(
+                request_id=int(pk),
+                user=request.user,
+                reason=request.data.get("reason", ""),
+            )
+            return Response(HiringRequestSerializer(obj).data)
+        except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ─── Job Advertisement ─────────────────────────────────────────────────────────
 
 class JobAdvertisementViewSet(viewsets.ModelViewSet):
-    """CRUD + publish/close actions for Job Advertisements."""
-    serializer_class = JobAdvertisementSerializer
+    """
+    CRUD + workflow actions for Job Advertisements.
+
+    Lifecycle:
+      draft → [publish] → published → [close] → closed → [reopen] → draft
+
+    Edit rules (enforced by service):
+      - PUT/PATCH on DRAFT:     all content fields editable.
+      - PUT/PATCH on PUBLISHED: only deadline and platforms editable.
+      - PUT/PATCH on CLOSED:    not allowed.
+      - DELETE:                 only DRAFT ads can be deleted (soft delete).
+    """
     queryset = JobAdvertisement.objects.all()
+
+    def get_serializer_class(self):
+        if self.action in ("update", "partial_update"):
+            return JobAdvertisementUpdateSerializer
+        return JobAdvertisementSerializer
 
     def get_queryset(self):
         cid = _company_id(self.request)
         status_filter = self.request.query_params.get("status")
         if cid:
             return get_advertisements_for_company(cid, status=status_filter)
-        return super().get_queryset().select_related(
-            "hiring_request__job_title", "hiring_request__department"
+        return (
+            super().get_queryset()
+            .select_related("hiring_request__job_title", "hiring_request__department")
         )
+
+    # ── Update (PUT / PATCH) ────────────────────────────────────────────────────
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        try:
+            updated = JobAdvertisementService.update_advertisement(
+                ad_id=instance.pk,
+                user=request.user,
+                data=serializer.validated_data,
+            )
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(JobAdvertisementSerializer(updated).data)
+
+    # ── Delete ──────────────────────────────────────────────────────────────────
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            JobAdvertisementService.soft_delete_advertisement(
+                ad_id=instance.pk,
+                user=request.user,
+            )
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ── Workflow actions ─────────────────────────────────────────────────────────
 
     @action(detail=True, methods=["post"], url_path="publish")
     def publish(self, request, pk=None):
+        """
+        Publish a draft advertisement.
+
+        Body (optional):
+          { "deadline": "YYYY-MM-DD", "platforms": ["internal", "linkedin"] }
+        """
         try:
             obj = JobAdvertisementService.publish_advertisement(pk, request.user, request.data)
-            return Response(self.get_serializer(obj).data)
+            return Response(JobAdvertisementSerializer(obj).data)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["post"], url_path="close")
     def close(self, request, pk=None):
+        """Close a published advertisement."""
         try:
             obj = JobAdvertisementService.close_advertisement(pk, request.user)
-            return Response(self.get_serializer(obj).data)
+            return Response(JobAdvertisementSerializer(obj).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"], url_path="reopen")
+    def reopen(self, request, pk=None):
+        """
+        Reopen a closed advertisement back to draft for revision.
+        Clears closed_at so it can be re-published cleanly.
+        """
+        try:
+            obj = JobAdvertisementService.reopen_advertisement(pk, request.user)
+            return Response(JobAdvertisementSerializer(obj).data)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -198,9 +349,11 @@ class InterviewViewSet(viewsets.ModelViewSet):
         if application_id:
             return get_interviews_for_application(application_id)
         cid = _company_id(self.request)
-        qs = super().get_queryset().select_related(
-            "application", "application__candidate"
-        ).prefetch_related("interviewers")
+        qs = (
+            super().get_queryset()
+            .select_related("application", "application__candidate")
+            .prefetch_related("interviewers")
+        )
         if cid:
             qs = qs.filter(application__candidate__company_id=cid)
         return qs
