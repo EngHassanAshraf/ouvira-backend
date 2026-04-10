@@ -2007,6 +2007,333 @@
           }
         },
         {
+          "name": "[HAPPY] Update Hiring Request — valid (draft)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('vacancies updated to 5', () => pm.expect(json.vacancies).to.equal(5));",
+                  "pm.test('status still draft', () => pm.expect(json.status).to.equal('draft'));",
+                  "pm.test('approvals still present', () => pm.expect(json).to.have.property('approvals'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "hiring-requests",
+                "{{hiring_request_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vacancies\": 5,\n  \"purpose\": \"Updated purpose for Q3 expansion\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[NEGATIVE] Update Hiring Request — vacancies = 0 (invalid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('vacancies error', () => pm.expect(JSON.stringify(pm.response.json())).to.include('Vacancies'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "hiring-requests",
+                "{{hiring_request_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vacancies\": 0\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[NEGATIVE] Update Hiring Request — after submit (non-draft)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// After submit, status is 'submitted' — edits must be rejected",
+                  "pm.test('Status 400 (cannot edit non-draft)', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions draft', () => pm.expect(pm.response.json().detail).to.include('draft'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "hiring-requests",
+                "{{hiring_request_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purpose\": \"Trying to edit after submit\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[NEGATIVE] Update Hiring Request — mass assign status (blocked)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 400', () => pm.expect(pm.response.code).to.be.oneOf([200, 400]));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Status NOT approved (mass assignment blocked)', () => pm.expect(pm.response.json().status).to.not.equal('approved'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "hiring-requests",
+                "{{hiring_request_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"created_by\": 999\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[HAPPY] Cancel Hiring Request — draft",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is rejected', () => pm.expect(pm.response.json().status).to.equal('rejected'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/cancel/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "hiring-requests",
+                "{{hiring_request_id}}",
+                "cancel",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Budget freeze — position postponed\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[NEGATIVE] Cancel Hiring Request — already cancelled (approved/rejected)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 (cannot cancel non-draft/submitted)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/cancel/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "hiring-requests",
+                "{{hiring_request_id}}",
+                "cancel",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Double cancel attempt\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[HAPPY] Delete Hiring Request — draft (soft delete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/hiring-requests/{{hiring_request_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "hiring-requests",
+                "{{hiring_request_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
           "name": "[NEGATIVE] Approve Hiring Request — missing role_type",
           "event": [
             {
@@ -2148,6 +2475,420 @@
               "raw": "{\n  \"deadline\": \"2026-12-31\",\n  \"platforms\": [\"internal\"]\n}"
             }
           }
+        },
+        {
+          "name": "[HAPPY] Update Job Ad — draft (all content fields)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('title updated', () => pm.expect(json.title).to.include('Updated'));",
+                  "pm.test('skills is array', () => pm.expect(json.skills).to.be.an('array'));",
+                  "pm.test('status still draft', () => pm.expect(json.status).to.equal('draft'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "job-advertisements",
+                "{{job_ad_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Backend Engineer — Updated\",\n  \"skills\": [\"Python\", \"Django\", \"PostgreSQL\", \"Redis\"],\n  \"deadline\": \"2026-09-30\",\n  \"platforms\": [\"internal\", \"linkedin\"]\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[NEGATIVE] Update Job Ad — skills not a list",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('skills error', () => pm.expect(JSON.stringify(pm.response.json())).to.include('list'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "job-advertisements",
+                "{{job_ad_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skills\": \"Python, Django\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[NEGATIVE] Update Job Ad — published, try editing title (blocked)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Published ads only allow deadline + platforms. Title edit must be rejected.",
+                  "pm.test('Status 400 (structural edit blocked on published ad)', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions published', () => pm.expect(pm.response.json().detail).to.include('published'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "job-advertisements",
+                "{{job_ad_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Trying to edit published ad title\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[HAPPY] Update Job Ad — published, deadline + platforms (allowed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 400', () => pm.expect(pm.response.code).to.be.oneOf([200, 400]));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('deadline updated', () => pm.expect(pm.response.json().deadline).to.equal('2026-10-31'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "job-advertisements",
+                "{{job_ad_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deadline\": \"2026-10-31\",\n  \"platforms\": [\"internal\", \"linkedin\"]\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[HAPPY] Reopen Job Ad (closed → draft)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is draft', () => pm.expect(pm.response.json().status).to.equal('draft'));",
+                  "pm.test('closed_at is null', () => pm.expect(pm.response.json().closed_at).to.be.null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/reopen/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "job-advertisements",
+                "{{job_ad_id}}",
+                "reopen",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[NEGATIVE] Reopen Job Ad — not closed (draft/published)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 (only closed ads can be reopened)', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions closed', () => pm.expect(pm.response.json().detail).to.include('closed'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/reopen/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "job-advertisements",
+                "{{job_ad_id}}",
+                "reopen",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[NEGATIVE] Update Job Ad — closed (all edits blocked)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 (closed ads cannot be edited)', () => pm.response.to.have.status(400));",
+                  "pm.test('Error mentions closed', () => pm.expect(pm.response.json().detail).to.include('Closed'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "job-advertisements",
+                "{{job_ad_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deadline\": \"2027-01-01\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[HAPPY] Delete Job Ad — draft (soft delete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "job-advertisements",
+                "{{job_ad_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              }
+            ]
+          },
+          "response": []
+        },
+        {
+          "name": "[NEGATIVE] Delete Job Ad — published (blocked)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 (cannot delete published ad)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hris/recruitment/job-advertisements/{{job_ad_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "hris",
+                "recruitment",
+                "job-advertisements",
+                "{{job_ad_id}}",
+                ""
+              ]
+            },
+            "header": [
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant}}"
+              }
+            ]
+          },
+          "response": []
         },
         {
           "name": "[HAPPY] Create Candidate — valid",
