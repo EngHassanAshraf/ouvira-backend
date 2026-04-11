@@ -76,7 +76,17 @@ class HiringRequestViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         cid = _company_id(self.request)
         if cid:
-            return get_hiring_requests_for_company(cid)
+            filters = {}
+            params = self.request.query_params
+            if params.get("department"):
+                filters["department"] = params["department"]
+            if params.get("status"):
+                filters["status"] = params["status"]
+            if params.get("job_title"):
+                filters["job_title"] = params["job_title"]
+            if params.get("created_by"):
+                filters["created_by"] = params["created_by"]
+            return get_hiring_requests_for_company(cid, filters=filters if filters else None)
         return (
             super().get_queryset()
             .select_related("job_title", "department", "created_by")
@@ -193,6 +203,55 @@ class HiringRequestViewSet(viewsets.ModelViewSet):
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=True, methods=["get"], url_path="approval-flow")
+    def approval_flow(self, request, pk=None):
+        """Return the full approval chain timeline for a hiring request."""
+        instance = self.get_object()
+        approvals = instance.approvals.order_by("created_at")
+        from .serializers import ApprovalFlowSerializer
+        return Response(ApprovalFlowSerializer(approvals, many=True).data)
+
+    @action(detail=False, methods=["post"], url_path="bulk-approve")
+    def bulk_approve(self, request):
+        """Bulk approve hiring requests."""
+        ids = request.data.get("ids", [])
+        role_type = request.data.get("role_type")
+        note = request.data.get("note", "")
+        if not role_type:
+            return Response({"detail": "role_type is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            from ...application.services.bulk_action_service import BulkActionService
+            result = BulkActionService.bulk_approve_hiring_requests(ids, request.user, role_type, note)
+            return Response(result)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["post"], url_path="bulk-reject")
+    def bulk_reject(self, request):
+        """Bulk reject hiring requests."""
+        ids = request.data.get("ids", [])
+        role_type = request.data.get("role_type")
+        reason = request.data.get("reason", "")
+        if not role_type or not reason:
+            return Response({"detail": "role_type and reason are required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            from ...application.services.bulk_action_service import BulkActionService
+            result = BulkActionService.bulk_reject_hiring_requests(ids, request.user, role_type, reason)
+            return Response(result)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """Bulk delete (soft) hiring requests."""
+        ids = request.data.get("ids", [])
+        try:
+            from ...application.services.bulk_action_service import BulkActionService
+            result = BulkActionService.bulk_delete_hiring_requests(ids, request.user)
+            return Response(result)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 # ─── Job Advertisement ─────────────────────────────────────────────────────────
 
@@ -218,9 +277,13 @@ class JobAdvertisementViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         cid = _company_id(self.request)
-        status_filter = self.request.query_params.get("status")
+        params = self.request.query_params
         if cid:
-            return get_advertisements_for_company(cid, status=status_filter)
+            filters = {}
+            for key in ("status", "city", "area", "platforms", "deadline_before", "deadline_after"):
+                if params.get(key):
+                    filters[key] = params[key]
+            return get_advertisements_for_company(cid, filters=filters if filters else None)
         return (
             super().get_queryset()
             .select_related("hiring_request__job_title", "hiring_request__department")
@@ -293,6 +356,28 @@ class JobAdvertisementViewSet(viewsets.ModelViewSet):
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=["post"], url_path="bulk-publish")
+    def bulk_publish(self, request):
+        """Bulk publish job advertisements."""
+        ids = request.data.get("ids", [])
+        try:
+            from ...application.services.bulk_action_service import BulkActionService
+            result = BulkActionService.bulk_publish_advertisements(ids, request.user)
+            return Response(result)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["post"], url_path="bulk-close")
+    def bulk_close(self, request):
+        """Bulk close job advertisements."""
+        ids = request.data.get("ids", [])
+        try:
+            from ...application.services.bulk_action_service import BulkActionService
+            result = BulkActionService.bulk_close_advertisements(ids, request.user)
+            return Response(result)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 # ─── Candidate ─────────────────────────────────────────────────────────────────
 
@@ -318,9 +403,13 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         cid = _company_id(self.request)
-        status_filter = self.request.query_params.get("status")
+        params = self.request.query_params
         if cid:
-            return get_applications_for_company(cid, status=status_filter)
+            filters = {}
+            for key in ("status", "classification", "job_board", "job_advertisement", "candidate"):
+                if params.get(key):
+                    filters[key] = params[key]
+            return get_applications_for_company(cid, filters=filters if filters else None)
         return super().get_queryset().select_related("candidate", "job_advertisement")
 
     @action(detail=True, methods=["post"], url_path="move-to-stage")
@@ -333,6 +422,54 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                 pk, new_status, request.user, request.data.get("classification")
             )
             return Response(self.get_serializer(obj).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["post"], url_path="import-cvs",
+            parser_classes=None)  # will use MultiPartParser
+    def import_cvs(self, request):
+        """Import candidates from Excel/CSV file."""
+        from rest_framework.parsers import MultiPartParser
+        file = request.FILES.get("file")
+        job_ad_id = request.data.get("job_advertisement_id")
+        if not file:
+            return Response({"detail": "file is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not job_ad_id:
+            return Response({"detail": "job_advertisement_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            from ...application.services.import_service import ImportService
+            from .serializers import ImportSummarySerializer
+            result = ImportService.import_cvs(file, int(job_ad_id), _company_id(request), request.user)
+            return Response(ImportSummarySerializer(result).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["post"], url_path="sync-from-job-boards")
+    def sync_from_job_boards(self, request):
+        """Sync candidates from external job boards (placeholder)."""
+        job_ad_id = request.data.get("job_advertisement_id")
+        platforms = request.data.get("platforms", [])
+        if not job_ad_id:
+            return Response({"detail": "job_advertisement_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            from ...application.services.job_board_sync_service import JobBoardSyncService
+            from .serializers import SyncResultSerializer
+            result = JobBoardSyncService.sync(int(job_ad_id), platforms, _company_id(request))
+            return Response(SyncResultSerializer(result).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["post"], url_path="bulk-edit")
+    def bulk_edit(self, request):
+        """Bulk update classification on multiple applications."""
+        ids = request.data.get("ids", [])
+        classification = request.data.get("classification")
+        if not classification:
+            return Response({"detail": "classification is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            from ...application.services.bulk_action_service import BulkActionService
+            result = BulkActionService.bulk_edit_applications(ids, request.user, classification)
+            return Response(result)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -374,7 +511,9 @@ class InterviewViewSet(viewsets.ModelViewSet):
             return Response({"detail": "scoring_data is required."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             obj = InterviewService.record_interview_result(
-                pk, request.user, scoring, request.data.get("note")
+                pk, request.user, scoring,
+                note=request.data.get("note"),
+                call_status=request.data.get("call_status"),
             )
             return Response(self.get_serializer(obj).data)
         except ValueError as e:
@@ -471,3 +610,122 @@ class OnboardingViewSet(viewsets.ModelViewSet):
         if cid:
             qs = qs.filter(candidate__company_id=cid)
         return qs
+
+
+# ─── Recruitment Audit Log ─────────────────────────────────────────────────────
+
+from rest_framework.pagination import PageNumberPagination
+from apps.audit.models import ActivityLog
+
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+class RecruitmentAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only audit log scoped to recruitment entity types."""
+    pagination_class = StandardResultsSetPagination
+
+    ENTITY_TYPE_MAP = {
+        "hiring-requests":    "hiring_request",
+        "job-advertisements": "job_advertisement",
+        "applications":       "application",
+    }
+
+    def get_serializer_class(self):
+        from .serializers import ActivityLogSerializer
+        return ActivityLogSerializer
+
+    def get_queryset(self):
+        entity_key = self.kwargs.get("entity_type", "")
+        entity_type = self.ENTITY_TYPE_MAP.get(entity_key)
+        if not entity_type:
+            return ActivityLog.objects.none()
+
+        cid = _company_id(self.request)
+        qs = ActivityLog.objects.filter(
+            company_id=cid,
+            entity_type=entity_type,
+        ).select_related("user").order_by("-created_at")
+
+        # Apply filters
+        params = self.request.query_params
+        if params.get("action_type"):
+            qs = qs.filter(action=params["action_type"])
+        if params.get("performed_by"):
+            qs = qs.filter(user_id=params["performed_by"])
+        if params.get("from_date"):
+            qs = qs.filter(created_at__date__gte=params["from_date"])
+        if params.get("to_date"):
+            qs = qs.filter(created_at__date__lte=params["to_date"])
+        if params.get("search"):
+            qs = qs.filter(action__icontains=params["search"])
+
+        return qs
+
+
+# ─── Post-Probation Evaluation ─────────────────────────────────────────────────
+
+class PostProbationEvaluationViewSet(viewsets.ModelViewSet):
+    """CRUD + workflow actions for Post-Probation Evaluations."""
+
+    def get_serializer_class(self):
+        from .serializers import PostProbationEvaluationSerializer
+        return PostProbationEvaluationSerializer
+
+    def get_queryset(self):
+        from ...models import PostProbationEvaluation
+        cid = _company_id(self.request)
+        qs = PostProbationEvaluation.objects.select_related(
+            "application__candidate", "evaluated_by"
+        )
+        if cid:
+            qs = qs.filter(application__candidate__company_id=cid)
+        return qs
+
+    @action(detail=True, methods=["post"], url_path="submit-to-manager")
+    def submit_to_manager(self, request, pk=None):
+        try:
+            from ...application.services.post_probation_service import PostProbationService
+            from .serializers import PostProbationEvaluationSerializer
+            obj = PostProbationService.submit_to_manager(pk, request.user)
+            return Response(PostProbationEvaluationSerializer(obj).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"], url_path="manager-approve")
+    def manager_approve(self, request, pk=None):
+        try:
+            from ...application.services.post_probation_service import PostProbationService
+            from .serializers import PostProbationEvaluationSerializer
+            obj = PostProbationService.manager_approve(pk, request.user, request.data.get("note", ""))
+            return Response(PostProbationEvaluationSerializer(obj).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"], url_path="hr-confirm")
+    def hr_confirm(self, request, pk=None):
+        try:
+            from ...application.services.post_probation_service import PostProbationService
+            from .serializers import PostProbationEvaluationSerializer
+            obj = PostProbationService.hr_confirm(pk, request.user, request.data.get("note", ""))
+            return Response(PostProbationEvaluationSerializer(obj).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"], url_path="record-decision")
+    def record_decision(self, request, pk=None):
+        decision = request.data.get("decision")
+        if not decision:
+            return Response({"detail": "decision is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            from ...application.services.post_probation_service import PostProbationService
+            from .serializers import PostProbationEvaluationSerializer
+            obj = PostProbationService.record_decision(
+                pk, request.user, decision, request.data.get("rationale", "")
+            )
+            return Response(PostProbationEvaluationSerializer(obj).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)

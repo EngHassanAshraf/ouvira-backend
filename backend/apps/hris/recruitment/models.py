@@ -86,10 +86,18 @@ class JobApplication(TimeStampedModel, SoftDeleteModel):
         SHORTLIST_1 = "shortlist_1", _("Shortlist 1")
         SHORTLIST_2 = "shortlist_2", _("Shortlist 2")
         NONE = "none", _("None")
+    class JobBoardSource(models.TextChoices):
+        LINKEDIN = "linkedin", _("LinkedIn")
+        FACEBOOK = "facebook", _("Facebook")
+        BAYT = "bayt", _("Bayt")
+        RECOMMENDATION = "recommendation", _("Recommendation")
+        INTERNAL = "internal", _("Internal")
+        OTHER = "other", _("Other")
     candidate = models.ForeignKey(Candidate, on_delete=models.CASCADE, related_name="applications")
     job_advertisement = models.ForeignKey(JobAdvertisement, on_delete=models.CASCADE, related_name="applications")
     status = models.CharField(max_length=20, choices=AppStatus.choices, default=AppStatus.APPLIED)
     classification = models.CharField(max_length=20, choices=Classification.choices, default=Classification.NONE)
+    job_board = models.CharField(max_length=100, choices=JobBoardSource.choices, blank=True, null=True)
     applied_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True, null=True)
     class Meta:
@@ -104,10 +112,15 @@ class Interview(TimeStampedModel, SoftDeleteModel):
         SCHEDULED = "scheduled", _("Scheduled")
         COMPLETED = "completed", _("Completed")
         CANCELLED = "cancelled", _("Cancelled")
+    class CallStatus(models.TextChoices):
+        NOT_ANSWERED = "not_answered", _("Not Answered")
+        SUITABLE = "suitable", _("Suitable")
+        CALL_BACK = "call_back", _("Call Back")
     application = models.ForeignKey(JobApplication, on_delete=models.CASCADE, related_name="interviews")
     interview_type = models.CharField(max_length=20, choices=InterviewType.choices, default=InterviewType.PHONE)
     interview_date = models.DateTimeField()
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
+    call_status = models.CharField(max_length=20, choices=CallStatus.choices, blank=True, null=True)
     interviewers = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="interviews_as_interviewer")
     average_score = models.FloatField(default=0.0)
     scoring_data = models.JSONField(default=dict, blank=True)
@@ -123,6 +136,7 @@ class CandidateDocument(TimeStampedModel, SoftDeleteModel):
         MILITARY_STATUS = "military_status", _("Military Status")
         PERSONAL_PHOTO = "personal_photo", _("Personal Photo")
         POLICE_CLEARANCE = "police_clearance", _("Police Clearance")
+        BIRTH_CERTIFICATE = "birth_certificate", _("Birth Certificate")
         OTHER = "other", _("Other")
     class Status(models.TextChoices):
         PENDING = "pending", _("Pending Approval")
@@ -156,6 +170,7 @@ class JobOffer(TimeStampedModel, SoftDeleteModel):
     benefits = models.TextField(blank=True, null=True, verbose_name=_("Benefits Package"))
     start_date = models.DateField(verbose_name=_("Proposed Start Date"))
     
+    offer_validity_date = models.DateField(null=True, blank=True)
     status = models.CharField(
         max_length=20, 
         choices=OfferStatus.choices, 
@@ -188,10 +203,23 @@ class Onboarding(TimeStampedModel, SoftDeleteModel):
     # Flexible checklist (e.g. {"workspace": true, "email_created": false})
     tasks = models.JSONField(default=dict, blank=True)
     status = models.CharField(
-        max_length=20, 
-        choices=Status.choices, 
+        max_length=20,
+        choices=Status.choices,
         default=Status.NOT_STARTED
     )
+    session_date = models.DateTimeField(null=True, blank=True)
+    session_location = models.CharField(max_length=200, blank=True)
+    assigned_mentor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mentored_onboardings",
+    )
+    attended = models.BooleanField(null=True)
+    engagement_level = models.PositiveSmallIntegerField(null=True, blank=True)
+    survey_link = models.URLField(blank=True, null=True)
+    survey_responses = models.JSONField(default=dict, blank=True)
 
     class Meta:
         db_table = "hris_recruitment_onboarding"
@@ -199,22 +227,62 @@ class Onboarding(TimeStampedModel, SoftDeleteModel):
 
 
 class PostProbationEvaluation(TimeStampedModel, SoftDeleteModel):
+    class WorkflowStatus(models.TextChoices):
+        DRAFT = "draft", _("Draft")
+        SUBMITTED_TO_MANAGER = "submitted_to_manager", _("Submitted to Manager")
+        MANAGER_APPROVED = "manager_approved", _("Manager Approved")
+        HR_CONFIRMED = "hr_confirmed", _("HR Confirmed")
+        FINAL_DECISION = "final_decision", _("Final Decision")
+
     application = models.OneToOneField(
-        JobApplication, 
-        on_delete=models.CASCADE, 
+        JobApplication,
+        on_delete=models.CASCADE,
         related_name="post_probation"
     )
     # Evaluated by Manager after 3 months (placeholder)
     evaluation_date = models.DateField()
     performance_score = models.IntegerField(default=0)
     decision = models.CharField(
-        max_length=50, 
+        max_length=50,
         choices=[("confirmed", "Confirmed"), ("terminated", "Terminated")]
     )
     comments = models.TextField(blank=True, null=True)
 
+    # Score fields
+    tasks_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    attendance_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    initiative_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    collaboration_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    teamwork_score = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    average_score = models.FloatField(null=True, blank=True)
+    evaluated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="evaluations_as_evaluator",
+    )
+    workflow_status = models.CharField(
+        max_length=30,
+        choices=WorkflowStatus.choices,
+        default=WorkflowStatus.DRAFT,
+    )
+    manager_note = models.TextField(blank=True)
+    hr_note = models.TextField(blank=True)
+    rationale = models.TextField(blank=True)
+
     class Meta:
         db_table = "hris_recruitment_post_probation_evaluations"
+
+    def save(self, *args, **kwargs):
+        scores = [s for s in [
+            self.tasks_score, self.attendance_score,
+            self.initiative_score, self.collaboration_score,
+            self.teamwork_score
+        ] if s is not None]
+        self.average_score = round(sum(scores) / len(scores), 2) if scores else None
+        super().save(*args, **kwargs)
 
 
 # Legacy / Placeholder models

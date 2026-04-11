@@ -4,6 +4,7 @@ from django.utils import timezone
 from apps.audit.services.activity_log_service import ActivityLogService
 from apps.audit.utils import get_or_create_date_dim
 from ...models import Candidate, JobApplication, JobAdvertisement
+from .recruitment_audit_service import RecruitmentAuditService
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,16 @@ class ApplicationService:
             action=f"STAGE_CHANGED_TO_{new_status.upper()}",
             old_values={"status": old_status},
             new_values={"status": new_status, "classification": classification}
+        )
+
+        RecruitmentAuditService.log(
+            user=user,
+            company=application.job_advertisement.hiring_request.company,
+            entity_type="application",
+            entity_id=application.pk,
+            action="stage_moved",
+            entity_label=f"{application.candidate} — {application.job_advertisement.title}",
+            details={"from_status": old_status, "to_status": new_status},
         )
 
         return application

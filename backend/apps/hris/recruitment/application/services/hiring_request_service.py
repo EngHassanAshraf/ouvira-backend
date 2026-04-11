@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from apps.audit.services.activity_log_service import ActivityLogService
 from apps.audit.utils import get_or_create_date_dim
 from ...models import HiringRequest, HiringRequestApproval
+from .recruitment_audit_service import RecruitmentAuditService
 from ...domain.events.dispatcher import dispatcher
 from ...domain.events.events import (
     HiringRequestSubmitted,
@@ -156,6 +157,16 @@ class HiringRequestService:
             new_values={"status": hiring_request.status, "reason": reason}
         )
 
+        RecruitmentAuditService.log(
+            user=user,
+            company=hiring_request.company,
+            entity_type="hiring_request",
+            entity_id=hiring_request.pk,
+            action="cancelled",
+            entity_label=str(hiring_request.job_title),
+            details={"reason": reason},
+        )
+
         return hiring_request
 
     @staticmethod
@@ -187,6 +198,15 @@ class HiringRequestService:
             entity_type="HiringRequest",
             entity_id=hiring_request.id,
             action="DELETED"
+        )
+
+        RecruitmentAuditService.log(
+            user=user,
+            company=hiring_request.company,
+            entity_type="hiring_request",
+            entity_id=hiring_request.pk,
+            action="deleted",
+            entity_label=str(hiring_request.job_title),
         )
 
     @staticmethod
@@ -223,6 +243,15 @@ class HiringRequestService:
             action="SUBMITTED"
         )
 
+        RecruitmentAuditService.log(
+            user=user,
+            company=hiring_request.company,
+            entity_type="hiring_request",
+            entity_id=hiring_request.pk,
+            action="submitted",
+            entity_label=str(hiring_request.job_title),
+        )
+
         dispatcher.dispatch(HiringRequestSubmitted(
             request_id=hiring_request.id,
             company_id=hiring_request.company.id,
@@ -255,6 +284,16 @@ class HiringRequestService:
             entity_type="HiringRequest",
             entity_id=hiring_request.id,
             action=f"APPROVED_{role_type.upper()}"
+        )
+
+        RecruitmentAuditService.log(
+            user=user,
+            company=hiring_request.company,
+            entity_type="hiring_request",
+            entity_id=hiring_request.pk,
+            action="approved",
+            entity_label=str(hiring_request.job_title),
+            details={"role_type": role_type},
         )
 
         if not HiringRequestApproval.objects.filter(
@@ -300,6 +339,16 @@ class HiringRequestService:
             entity_id=hiring_request.id,
             action=f"REJECTED_{role_type.upper()}",
             new_values={"reason": reason}
+        )
+
+        RecruitmentAuditService.log(
+            user=user,
+            company=hiring_request.company,
+            entity_type="hiring_request",
+            entity_id=hiring_request.pk,
+            action="rejected",
+            entity_label=str(hiring_request.job_title),
+            details={"role_type": role_type, "reason": reason},
         )
 
         dispatcher.dispatch(HiringRequestRejected(

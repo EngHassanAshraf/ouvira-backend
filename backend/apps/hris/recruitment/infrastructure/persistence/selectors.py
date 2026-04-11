@@ -22,13 +22,23 @@ from ...models import (
 
 # ─── Hiring Request ────────────────────────────────────────────────────────────
 
-def get_hiring_requests_for_company(company_id):
-    return (
+def get_hiring_requests_for_company(company_id, filters=None):
+    qs = (
         HiringRequest.objects.filter(company_id=company_id)
         .select_related("job_title", "department", "created_by")
         .prefetch_related("approvals")
         .order_by("-created_at")
     )
+    if filters:
+        if filters.get("department"):
+            qs = qs.filter(department_id=filters["department"])
+        if filters.get("status"):
+            qs = qs.filter(status=filters["status"])
+        if filters.get("job_title"):
+            qs = qs.filter(job_title_id=filters["job_title"])
+        if filters.get("created_by"):
+            qs = qs.filter(created_by_id=filters["created_by"])
+    return qs
 
 
 def get_hiring_request_by_id(request_id):
@@ -41,12 +51,25 @@ def get_hiring_request_by_id(request_id):
 
 # ─── Job Advertisement ─────────────────────────────────────────────────────────
 
-def get_advertisements_for_company(company_id, status=None):
+def get_advertisements_for_company(company_id, status=None, filters=None):
     qs = JobAdvertisement.objects.filter(
         hiring_request__company_id=company_id
     ).select_related("hiring_request__job_title", "hiring_request__department")
     if status:
         qs = qs.filter(status=status)
+    if filters:
+        if filters.get("status"):
+            qs = qs.filter(status=filters["status"])
+        if filters.get("city"):
+            qs = qs.filter(city__icontains=filters["city"])
+        if filters.get("area"):
+            qs = qs.filter(area__icontains=filters["area"])
+        if filters.get("platforms"):
+            qs = qs.filter(platforms__contains=filters["platforms"])
+        if filters.get("deadline_before"):
+            qs = qs.filter(deadline__lte=filters["deadline_before"])
+        if filters.get("deadline_after"):
+            qs = qs.filter(deadline__gte=filters["deadline_after"])
     return qs.order_by("-created_at")
 
 
@@ -72,12 +95,23 @@ def get_applications_for_advertisement(advertisement_id):
     )
 
 
-def get_applications_for_company(company_id, status=None):
+def get_applications_for_company(company_id, status=None, filters=None):
     qs = JobApplication.objects.filter(
         candidate__company_id=company_id
     ).select_related("candidate", "job_advertisement")
     if status:
         qs = qs.filter(status=status)
+    if filters:
+        if filters.get("status"):
+            qs = qs.filter(status=filters["status"])
+        if filters.get("classification"):
+            qs = qs.filter(classification=filters["classification"])
+        if filters.get("job_board"):
+            qs = qs.filter(job_board=filters["job_board"])
+        if filters.get("job_advertisement"):
+            qs = qs.filter(job_advertisement_id=filters["job_advertisement"])
+        if filters.get("candidate"):
+            qs = qs.filter(candidate_id=filters["candidate"])
     return qs.order_by("-applied_at")
 
 

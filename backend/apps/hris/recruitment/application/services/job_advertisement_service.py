@@ -4,6 +4,7 @@ from django.utils import timezone
 from apps.audit.services.activity_log_service import ActivityLogService
 from apps.audit.utils import get_or_create_date_dim
 from ...models import HiringRequest, JobAdvertisement
+from .recruitment_audit_service import RecruitmentAuditService
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,15 @@ class JobAdvertisementService:
             }
         )
 
+        RecruitmentAuditService.log(
+            user=user,
+            company=ad.hiring_request.company,
+            entity_type="job_advertisement",
+            entity_id=ad.pk,
+            action="published",
+            entity_label=ad.title,
+        )
+
         return ad
 
     @staticmethod
@@ -175,6 +185,15 @@ class JobAdvertisementService:
             entity_type="JobAdvertisement",
             entity_id=ad.id,
             action="CLOSED"
+        )
+
+        RecruitmentAuditService.log(
+            user=user,
+            company=ad.hiring_request.company,
+            entity_type="job_advertisement",
+            entity_id=ad.pk,
+            action="closed",
+            entity_label=ad.title,
         )
 
         return ad
@@ -207,6 +226,15 @@ class JobAdvertisementService:
             entity_type="JobAdvertisement",
             entity_id=ad.id,
             action="REOPENED"
+        )
+
+        RecruitmentAuditService.log(
+            user=user,
+            company=ad.hiring_request.company,
+            entity_type="job_advertisement",
+            entity_id=ad.pk,
+            action="reopened",
+            entity_label=ad.title,
         )
 
         return ad
