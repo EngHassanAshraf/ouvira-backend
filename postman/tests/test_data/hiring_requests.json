@@ -30,14 +30,14 @@
   {
     "scenario": "invalid_vacancies_zero",
     "vacancies": 0,
-    "purpose": "Zero vacancies — should fail",
+    "purpose": "Zero vacancies — rejected by serializer (min 1)",
     "expected_status": 400,
     "expected_state": null
   },
   {
     "scenario": "invalid_vacancies_negative",
     "vacancies": -5,
-    "purpose": "Negative vacancies — should fail",
+    "purpose": "Negative vacancies — rejected by serializer",
     "expected_status": 400,
     "expected_state": null
   },
@@ -66,8 +66,92 @@
   {
     "scenario": "extremely_long_purpose",
     "vacancies": 1,
-    "purpose": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium totam rem aperiam eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt neque porro quisquam est qui dolorem ipsum quia dolor sit amet consectetur adipisci velit sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.",
+    "purpose": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
     "expected_status": 201,
     "expected_state": "draft"
+  },
+  {
+    "scenario": "update_draft_valid",
+    "action": "update",
+    "update_fields": { "vacancies": 5, "purpose": "Updated — Q3 expansion" },
+    "precondition": "draft",
+    "expected_status": 200,
+    "expected_state": "draft",
+    "notes": "Only job_title, department, vacancies, purpose are editable"
+  },
+  {
+    "scenario": "update_draft_vacancies_zero",
+    "action": "update",
+    "update_fields": { "vacancies": 0 },
+    "precondition": "draft",
+    "expected_status": 400,
+    "expected_state": null,
+    "notes": "Serializer rejects vacancies < 1"
+  },
+  {
+    "scenario": "update_submitted_blocked",
+    "action": "update",
+    "update_fields": { "purpose": "Trying to edit after submit" },
+    "precondition": "submitted",
+    "expected_status": 400,
+    "expected_state": null,
+    "notes": "Service rejects edits on non-draft requests"
+  },
+  {
+    "scenario": "update_mass_assign_status",
+    "action": "update",
+    "update_fields": { "status": "approved", "created_by": 999 },
+    "precondition": "draft",
+    "expected_status": 200,
+    "expected_state": "draft",
+    "notes": "status and created_by are not in the editable whitelist — ignored silently"
+  },
+  {
+    "scenario": "cancel_draft",
+    "action": "cancel",
+    "body": { "reason": "Budget freeze — position postponed" },
+    "precondition": "draft",
+    "expected_status": 200,
+    "expected_state": "rejected"
+  },
+  {
+    "scenario": "cancel_submitted",
+    "action": "cancel",
+    "body": { "reason": "Headcount plan revised" },
+    "precondition": "submitted",
+    "expected_status": 200,
+    "expected_state": "rejected"
+  },
+  {
+    "scenario": "cancel_already_rejected",
+    "action": "cancel",
+    "body": { "reason": "Double cancel" },
+    "precondition": "rejected",
+    "expected_status": 400,
+    "expected_state": null,
+    "notes": "Terminal state — cannot cancel again"
+  },
+  {
+    "scenario": "cancel_approved_blocked",
+    "action": "cancel",
+    "body": { "reason": "Too late" },
+    "precondition": "approved",
+    "expected_status": 400,
+    "expected_state": null,
+    "notes": "Approved requests cannot be cancelled"
+  },
+  {
+    "scenario": "delete_draft_soft",
+    "action": "delete",
+    "precondition": "draft",
+    "expected_status": 204,
+    "notes": "Soft delete — is_deleted=True, record still in DB"
+  },
+  {
+    "scenario": "delete_submitted_blocked",
+    "action": "delete",
+    "precondition": "submitted",
+    "expected_status": 400,
+    "notes": "Must cancel before deleting"
   }
 ]

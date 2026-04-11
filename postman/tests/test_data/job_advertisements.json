@@ -1,0 +1,158 @@
+[
+  {
+    "scenario": "create_draft_valid",
+    "title": "Senior Backend Engineer",
+    "description": "We are looking for an experienced backend engineer.",
+    "requirements": "5+ years Python/Django, PostgreSQL, Redis",
+    "skills": ["Python", "Django", "PostgreSQL", "Redis"],
+    "responsibilities": "Design and build scalable REST APIs",
+    "city": "Cairo",
+    "area": "Maadi",
+    "deadline": "2026-09-30",
+    "platforms": ["internal", "linkedin"],
+    "expected_status": 201,
+    "expected_state": "draft"
+  },
+  {
+    "scenario": "create_arabic_title",
+    "title": "مهندس خلفية أول",
+    "description": "نبحث عن مهندس خلفية ذو خبرة",
+    "requirements": "خبرة 5 سنوات في Python/Django",
+    "skills": ["Python", "Django"],
+    "responsibilities": "تصميم وبناء واجهات برمجية قابلة للتوسع",
+    "city": "الرياض",
+    "area": "العليا",
+    "deadline": "2026-10-31",
+    "platforms": ["internal"],
+    "expected_status": 201,
+    "expected_state": "draft"
+  },
+  {
+    "scenario": "create_skills_not_list",
+    "title": "Backend Engineer",
+    "description": "...",
+    "requirements": "...",
+    "skills": "Python, Django",
+    "responsibilities": "...",
+    "expected_status": 400,
+    "notes": "skills must be a JSON array"
+  },
+  {
+    "scenario": "create_platforms_not_list",
+    "title": "Backend Engineer",
+    "description": "...",
+    "requirements": "...",
+    "skills": ["Python"],
+    "responsibilities": "...",
+    "platforms": "internal",
+    "expected_status": 400,
+    "notes": "platforms must be a JSON array"
+  },
+  {
+    "scenario": "update_draft_all_fields",
+    "action": "update",
+    "precondition": "draft",
+    "update_fields": {
+      "title": "Senior Backend Engineer — Updated",
+      "skills": ["Python", "Django", "PostgreSQL", "Redis", "Docker"],
+      "deadline": "2026-09-30",
+      "platforms": ["internal", "linkedin", "indeed"]
+    },
+    "expected_status": 200,
+    "expected_state": "draft"
+  },
+  {
+    "scenario": "update_published_deadline_platforms",
+    "action": "update",
+    "precondition": "published",
+    "update_fields": {
+      "deadline": "2026-10-31",
+      "platforms": ["internal", "linkedin"]
+    },
+    "expected_status": 200,
+    "expected_state": "published",
+    "notes": "Only deadline and platforms allowed on published ads"
+  },
+  {
+    "scenario": "update_published_title_blocked",
+    "action": "update",
+    "precondition": "published",
+    "update_fields": { "title": "Trying to change published title" },
+    "expected_status": 400,
+    "notes": "Structural edits blocked on published ads"
+  },
+  {
+    "scenario": "update_closed_blocked",
+    "action": "update",
+    "precondition": "closed",
+    "update_fields": { "deadline": "2027-01-01" },
+    "expected_status": 400,
+    "notes": "All edits blocked on closed ads — reopen first"
+  },
+  {
+    "scenario": "publish_draft",
+    "action": "publish",
+    "precondition": "draft",
+    "body": { "deadline": "2026-12-31", "platforms": ["internal"] },
+    "expected_status": 200,
+    "expected_state": "published"
+  },
+  {
+    "scenario": "publish_already_published",
+    "action": "publish",
+    "precondition": "published",
+    "body": {},
+    "expected_status": 400,
+    "notes": "Only draft ads can be published"
+  },
+  {
+    "scenario": "close_published",
+    "action": "close",
+    "precondition": "published",
+    "expected_status": 200,
+    "expected_state": "closed"
+  },
+  {
+    "scenario": "close_draft_blocked",
+    "action": "close",
+    "precondition": "draft",
+    "expected_status": 400,
+    "notes": "Only published ads can be closed"
+  },
+  {
+    "scenario": "reopen_closed",
+    "action": "reopen",
+    "precondition": "closed",
+    "expected_status": 200,
+    "expected_state": "draft",
+    "notes": "closed_at is cleared on reopen"
+  },
+  {
+    "scenario": "reopen_draft_blocked",
+    "action": "reopen",
+    "precondition": "draft",
+    "expected_status": 400,
+    "notes": "Only closed ads can be reopened"
+  },
+  {
+    "scenario": "reopen_published_blocked",
+    "action": "reopen",
+    "precondition": "published",
+    "expected_status": 400,
+    "notes": "Only closed ads can be reopened"
+  },
+  {
+    "scenario": "delete_draft_soft",
+    "action": "delete",
+    "precondition": "draft",
+    "expected_status": 204,
+    "notes": "Soft delete — is_deleted=True"
+  },
+  {
+    "scenario": "delete_published_blocked",
+    "action": "delete",
+    "precondition": "published",
+    "expected_status": 400,
+    "notes": "Close the ad first before deleting"
+  }
+]

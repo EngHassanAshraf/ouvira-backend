@@ -493,9 +493,28 @@ All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET/POST | `/api/v1/hris/recruitment/hiring-requests/` | List / create |
-| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/hiring-requests/{id}/` | Detail / update / delete |
+| GET | `/api/v1/hris/recruitment/hiring-requests/{id}/` | Detail |
+| PUT/PATCH | `/api/v1/hris/recruitment/hiring-requests/{id}/` | Update — **draft only** |
+| DELETE | `/api/v1/hris/recruitment/hiring-requests/{id}/` | Soft delete — **draft only** |
 | POST | `/api/v1/hris/recruitment/hiring-requests/{id}/submit/` | Submit for approval |
-| POST | `/api/v1/hris/recruitment/hiring-requests/{id}/approve/` | Approve (with role_type) |
+| POST | `/api/v1/hris/recruitment/hiring-requests/{id}/approve/` | Approve one step (`role_type` required) |
+| POST | `/api/v1/hris/recruitment/hiring-requests/{id}/reject/` | Reject at any step (`role_type` + `reason` required) |
+| POST | `/api/v1/hris/recruitment/hiring-requests/{id}/cancel/` | Cancel draft or submitted request |
+
+**Edit rules:**
+- `PUT/PATCH` only allowed on `draft` requests. Editable fields: `job_title`, `department`, `vacancies`, `purpose`.
+- `DELETE` only allowed on `draft` requests (soft delete). Cancel first if submitted.
+- `cancel` allowed on `draft` or `submitted`. Terminal — cannot be undone.
+
+**Approve body:**
+```json
+{ "role_type": "employee|hr_employee|direct_manager", "note": "optional" }
+```
+
+**Cancel body:**
+```json
+{ "reason": "Budget freeze — position postponed" }
+```
 
 **Object:**
 ```json
@@ -507,9 +526,12 @@ All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus
   "vacancies": 2,
   "purpose": "Expansion of engineering team",
   "status": "draft",
-  "created_by": 1
+  "created_by": 1,
+  "approvals": []
 }
 ```
+
+**Status lifecycle:** `draft` → `submitted` → `approved` | `rejected`
 
 ---
 
@@ -518,9 +540,20 @@ All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET/POST | `/api/v1/hris/recruitment/job-advertisements/` | List / create |
-| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/job-advertisements/{id}/` | Detail / update / delete |
-| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/publish/` | Publish ad |
-| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/close/` | Close ad |
+| GET | `/api/v1/hris/recruitment/job-advertisements/{id}/` | Detail |
+| PUT/PATCH | `/api/v1/hris/recruitment/job-advertisements/{id}/` | Update (state-dependent rules) |
+| DELETE | `/api/v1/hris/recruitment/job-advertisements/{id}/` | Soft delete — **draft only** |
+| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/publish/` | Publish draft ad |
+| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/close/` | Close published ad |
+| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/reopen/` | Reopen closed ad → draft |
+
+**Edit rules:**
+- `draft`: all content fields editable (`title`, `description`, `requirements`, `skills`, `responsibilities`, `city`, `area`, `deadline`, `platforms`).
+- `published`: only `deadline` and `platforms` editable.
+- `closed`: no edits allowed — reopen first.
+- `DELETE`: draft only. Close first if published.
+
+**Status lifecycle:** `draft` → `published` → `closed` → `draft` (via reopen)
 
 **Object:**
 ```json
@@ -534,7 +567,9 @@ All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus
   "responsibilities": "...",
   "deadline": "2026-06-30",
   "platforms": ["internal", "linkedin"],
-  "status": "draft"
+  "status": "draft",
+  "published_at": null,
+  "closed_at": null
 }
 ```
 

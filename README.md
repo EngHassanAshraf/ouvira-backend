@@ -178,11 +178,19 @@ See [api_documentation.md](api_documentation.md) for full endpoint reference.
 - **Attendance Tracking**: Clock-in/clock-out records
 
 ### Recruitment
-- **Hiring Requests**: Manager approval workflow
+- **Hiring Requests**: Manager approval workflow (employee → HR → direct manager)
+  - Edit: draft only (job_title, department, vacancies, purpose)
+  - Cancel: draft or submitted (terminal)
+  - Soft delete: draft only
+- **Job Advertisements**: Full lifecycle management
+  - Edit: draft (all fields) | published (deadline + platforms only) | closed (blocked)
+  - Reopen: closed → draft for revision
+  - Soft delete: draft only
 - **Candidate Management**: Candidate profiles and tracking
-- **Job Applications**: Application processing
-- **Interviews**: Interview scheduling and feedback
-- **Job Offers**: Offer generation and onboarding
+- **Job Applications**: Kanban pipeline (applied → phone_screening → interview → offer → hired/rejected)
+- **Interviews**: Interview scheduling and scoring
+- **Job Offers**: Offer generation, accept (creates Employee record), decline
+- **Onboarding**: Task checklist management
 
 ### Audit & Compliance
 - Activity logging for all operations
