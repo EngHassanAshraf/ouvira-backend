@@ -425,8 +425,7 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=["post"], url_path="import-cvs",
-            parser_classes=None)  # will use MultiPartParser
+    @action(detail=False, methods=["post"], url_path="import-cvs")
     def import_cvs(self, request):
         """Import candidates from Excel/CSV file."""
         from rest_framework.parsers import MultiPartParser

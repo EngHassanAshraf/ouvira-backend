@@ -296,6 +296,7 @@ class ActivityLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ActivityLog
+        ref_name = "RecruitmentActivityLog"
         fields = ["id", "action", "entity_type", "entity_id",
                   "performed_by_name", "performed_by_id", "timestamp", "details"]
         read_only_fields = ["id", "action", "entity_type", "entity_id",

@@ -115,6 +115,9 @@ class RoleListCreateView(ListCreateAPIView):
         return super().get_permissions()
 
     def get_queryset(self) -> QuerySet:
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import Role
+            return Role.objects.none()
         company_id = self.request.query_params.get("company")
         return RoleService.get_roles_for_user(
             self.request.user,
@@ -161,6 +164,9 @@ class RoleDetailView(RetrieveUpdateDestroyAPIView):
         return super().get_permissions()
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import Role
+            return Role.objects.none()
         return RoleService.get_roles_for_user(self.request.user)
 
     def destroy(self, request, *args, **kwargs):
@@ -205,6 +211,9 @@ class RolePermissionListCreateView(ListCreateAPIView):
         return super().get_permissions()
 
     def get_queryset(self) -> QuerySet:
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import RolePermission
+            return RolePermission.objects.none()
         role_id = self.request.query_params.get("role")
         return RolePermissionService.get_role_permissions_for_user(
             self.request.user,
@@ -245,6 +254,9 @@ class RolePermissionDetailView(RetrieveUpdateDestroyAPIView):
         return super().get_permissions()
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import RolePermission
+            return RolePermission.objects.none()
         return RolePermissionService.get_role_permissions_for_user(self.request.user)
 
     def perform_destroy(self, instance):
@@ -268,6 +280,9 @@ class UserCompanyListCreateView(ListCreateAPIView):
         return super().get_permissions()
 
     def get_queryset(self) -> QuerySet:
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import UserCompany
+            return UserCompany.objects.none()
         user_id = self.request.query_params.get("user")
         company_id = self.request.query_params.get("company")
 
@@ -318,6 +333,9 @@ class UserCompanyDetailView(RetrieveUpdateDestroyAPIView):
         return super().get_permissions()
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import UserCompany
+            return UserCompany.objects.none()
         return UserCompanyService.get_user_companies(
             self.request.user,
             filter_by_user=not UserCompanyService.is_user_admin(self.request.user),
@@ -344,6 +362,9 @@ class UserCompanyRoleListCreateView(ListCreateAPIView):
         return super().get_permissions()
 
     def get_queryset(self) -> QuerySet:
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import UserCompanyRole
+            return UserCompanyRole.objects.none()
         user_company_id = self.request.query_params.get("user_company")
         role_id = self.request.query_params.get("role")
 
@@ -387,6 +408,9 @@ class UserCompanyRoleDetailView(RetrieveUpdateDestroyAPIView):
         return super().get_permissions()
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import UserCompanyRole
+            return UserCompanyRole.objects.none()
         return UserCompanyRoleService.get_user_company_roles_for_user(self.request.user)
 
     def perform_destroy(self, instance):
@@ -414,6 +438,9 @@ class InvitationListCreateView(ListCreateAPIView):
         return super().get_permissions()
 
     def get_queryset(self) -> QuerySet:
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import Invitation
+            return Invitation.objects.none()
         company_id = self.request.query_params.get("company")
         status_filter = self.request.query_params.get("status")
 
@@ -472,6 +499,9 @@ class InvitationDetailView(RetrieveUpdateDestroyAPIView):
         return super().get_permissions()
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import Invitation
+            return Invitation.objects.none()
         return InvitationService.get_invitations_for_user(self.request.user)
 
 
