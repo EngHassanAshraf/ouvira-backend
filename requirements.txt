@@ -4,7 +4,7 @@
 # =============================================================================
 
 # --- Core Framework ---
-Django==5.2.9
+Django==5.2.13
 asgiref==3.11.0
 sqlparse==0.5.4
 
@@ -22,7 +22,7 @@ psycopg2-binary==2.9.11
 django-tenants==3.10.1
 
 # --- Authentication & Security ---
-PyJWT==2.10.1
+PyJWT==2.12.0
 pyotp==2.9.0
 
 # --- Task Queue ---
@@ -31,8 +31,8 @@ redis==7.4.0
 django-celery-beat==2.9.0
 
 # --- HTTP & Networking ---
-requests==2.32.5
-urllib3==2.6.2
+requests==2.33.0
+urllib3==2.6.3
 certifi==2025.11.12
 charset-normalizer==3.4.4
 idna==3.11
@@ -50,7 +50,7 @@ geoip2==5.1.0
 user-agents==2.2.0
 
 # --- Media ---
-Pillow==11.1.0
+Pillow==12.2.0
 
 # --- WSGI Server ---
 gunicorn==23.0.0
@@ -74,3 +74,4 @@ djangorestframework-stubs==3.16.6
 types-PyYAML==6.0.12.20250915
 types-requests==2.32.4.20250913
 tomli==2.3.0
+wheel==0.45.1
