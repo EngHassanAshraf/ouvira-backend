@@ -19,9 +19,9 @@ class PasswordResetTests(BaseAuthTestCase):
 
     def setUp(self):
         super().setUp()
-        self.request_url = reverse("password-forgot")
-        self.validate_url = reverse("password-reset-token")
-        self.reset_url = reverse("password-reset")
+        self.request_url = reverse("v1:auth:password-forgot")
+        self.validate_url = reverse("v1:auth:password-validate-reset-token")
+        self.reset_url = reverse("v1:auth:password-reset")
         
         self.user = CustomUser.objects.create_user(
             username="resetuser",

@@ -15,7 +15,7 @@ class ForgotPasswordTests(BaseAuthTestCase):
 
     def setUp(self):
         super().setUp()
-        self.forgot_url = reverse("password-forgot")
+        self.forgot_url = reverse("v1:auth:password-forgot")
         
         self.user = CustomUser.objects.create_user(
             username="forgotuser",

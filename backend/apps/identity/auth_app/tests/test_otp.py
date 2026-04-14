@@ -23,8 +23,8 @@ class OTPVerificationTests(BaseAuthTestCase):
 
     def setUp(self):
         super().setUp()
-        self.send_url = reverse("otp-send")
-        self.verify_url = reverse("otp-verify")
+        self.send_url = reverse("v1:auth:otp-send")
+        self.verify_url = reverse("v1:auth:otp-verify")
         self.identifier = "testuser@ouvira.app"
         # Clear cache between tests to isolate rate limits / locks
         cache.clear()
