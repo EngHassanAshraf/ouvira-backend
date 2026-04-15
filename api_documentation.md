@@ -12,13 +12,14 @@
 2. [Authentication](#authentication)
 3. [Error Handling](#error-handling)
 4. [Endpoints](#endpoints)
-   - [Auth](#1-auth--apiv1auth)
-   - [Account](#2-account--apiv1account)
-   - [Access Control](#3-access-control--apiv1access-control)
-   - [Company](#4-company--apiv1company)
-   - [HRIS Core](#5-hris-core--apiv1hriscore)
-   - [Recruitment](#6-recruitment--apiv1hrisrecruitment)
-   - [Audit](#7-audit--apiv1audit)
+   - [Auth (External)](#1-auth-external--apiv1auth)
+   - [Internal Auth](#2-internal-auth--apiv1hrisinternalauth)
+   - [Account](#3-account--apiv1account)
+   - [Access Control](#4-access-control--apiv1access-control)
+   - [Company](#5-company--apiv1company)
+   - [HRIS Core](#6-hris-core--apiv1hriscore)
+   - [Recruitment](#7-recruitment--apiv1hrisrecruitment)
+   - [Audit](#8-audit--apiv1audit)
 5. [Utility Endpoints](#utility-endpoints)
 6. [Pagination](#pagination)
 7. [Rate Limiting](#rate-limiting)
@@ -112,7 +113,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## Endpoints
 
-### 1. Auth — `/api/v1/auth/`
+### 1. Auth (External) — `/api/v1/auth/`
 
 #### POST `/api/v1/auth/signup/`
 **Auth:** None | **Rate:** 3/hour
@@ -268,7 +269,178 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 2. Account — `/api/v1/account/`
+### 2. Internal Auth — `/api/v1/hris/internal/auth/`
+
+Internal authentication for company employees and staff. Separate from the external auth flow — no OTP, no Turnstile, no signup. Returns enriched JWT with company context, employee context, roles, permissions, and a role-based redirect.
+
+**Two auth flows exist:**
+
+| Flow | Endpoint prefix | Who uses it |
+|------|----------------|-------------|
+| External | `/api/v1/auth/` | Customers, tenant owners, SaaS signup |
+| Internal | `/api/v1/hris/internal/auth/` | Employees, HR staff, managers, admins |
+
+---
+
+#### POST `/api/v1/hris/internal/auth/login/`
+
+**Auth:** None | **Rate:** 10/min
+
+Authenticate an internal user. Returns enriched JWT with company context, employee ID, roles, permissions, and a redirect hint.
+
+**Request:**
+
+```json
+{
+  "identifier": "ahmed@company.com",
+  "password": "SecureP@ss123",
+  "company_id": 1
+}
+```
+
+`company_id` is optional. If omitted, the user's primary active company is used. Required only for users who belong to multiple companies.
+
+**Response (200):**
+
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "eyJ...",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "user": {
+    "id": 1,
+    "account_uid": "USR-1234ABCD",
+    "email": "ahmed@company.com",
+    "full_name": "Ahmed Mohamed",
+    "company_id": 1,
+    "employee_id": "EMP-001",
+    "roles": ["HR_ADMIN"],
+    "permissions": ["hr.view_employee", "hr.edit_employee", "hr.approve_leave"],
+    "modules": ["hr"]
+  },
+  "redirect": {
+    "module": "hr",
+    "path": "/hr/dashboard"
+  }
+}
+```
+
+**JWT access token payload includes:**
+
+| Claim | Type | Description |
+|-------|------|-------------|
+| `user_id` | int | User primary key |
+| `company_id` | int | Resolved company |
+| `employee_id` | string \| null | Employee ID string (e.g. `EMP-001`) |
+| `roles` | string[] | All active role names for this user+company |
+| `permissions` | string[] | Flattened, deduplicated permission codes |
+| `modules` | string[] | Accessible module names derived from permissions |
+| `token_type` | string | Always `"internal_access"` |
+
+**Error responses:**
+
+| Status | When |
+|--------|------|
+| 400 | Missing or invalid input fields |
+| 401 | Wrong credentials, inactive account, deleted account, no active company |
+| 429 | Rate limit exceeded (10/min) |
+| 500 | Unexpected server error |
+
+All auth failures return `401` with a generic message — specific failure reasons are never exposed to prevent user enumeration.
+
+**Account lockout:** 5 consecutive failed attempts → 30-minute lockout. Returns `401` with lockout message.
+
+---
+
+#### POST `/api/v1/hris/internal/auth/logout/`
+
+**Auth:** Bearer Token (internal access token)
+
+Blacklist the refresh token. Uses the same SimpleJWT blacklist as the external flow.
+
+**Request:**
+
+```json
+{ "refresh_token": "eyJ..." }
+```
+
+**Response (205):**
+
+```json
+{ "detail": "Logged out successfully." }
+```
+
+---
+
+#### GET `/api/v1/hris/internal/auth/me/`
+
+**Auth:** Bearer Token (internal access token)
+
+Returns the current user's context decoded directly from the JWT — zero database queries.
+
+**Response (200):**
+
+```json
+{
+  "user_id": 1,
+  "company_id": 1,
+  "employee_id": "EMP-001",
+  "roles": ["HR_ADMIN"],
+  "permissions": ["hr.view_employee", "hr.edit_employee"],
+  "modules": ["hr"],
+  "token_type": "internal_access"
+}
+```
+
+---
+
+#### Role → Module Redirect Map
+
+The `redirect` object in the login response maps the user's highest-priority role to a default frontend route. Priority order (highest first):
+
+| Role | Module | Default Path |
+|------|--------|-------------|
+| `super_admin` / `system_admin` / `admin` | `admin` | `/admin/dashboard` |
+| `finance_director` | `finance` | `/finance/dashboard` |
+| `hr_admin` / `hr_manager` | `hr` | `/hr/dashboard` |
+| `payroll_admin` / `payroll_manager` | `payroll` | `/payroll/overview` |
+| `sales_director` / `crm_admin` | `sales` | `/sales/dashboard` |
+| `procurement_manager` | `procurement` | `/procurement/dashboard` |
+| `inventory_manager` / `warehouse_manager` | `inventory` | `/inventory/dashboard` |
+| `pmo_director` | `projects` | `/projects/dashboard` |
+| `it_manager` / `it_admin` | `it` | `/it/dashboard` |
+| `legal_manager` | `legal` | `/legal/dashboard` |
+| `marketing_director` | `marketing` | `/marketing/dashboard` |
+| `operations_director` / `operations_manager` | `operations` | `/operations/dashboard` |
+| `hr_employee` / `hr_staff` | `hr` | `/hr/employees` |
+| `payroll_staff` | `payroll` | `/payroll/runs` |
+| `recruiter` / `recruitment_manager` | `recruitment` | `/recruitment/pipeline` |
+| `direct_manager` / `department_manager` / `manager` | `hr` | `/hr/team` |
+| `employee` (default) | `self` | `/self-service/dashboard` |
+
+The frontend may override the redirect — the `redirect` field is a hint, not a hard redirect.
+
+---
+
+#### Internal Login Audit
+
+Every login attempt (success, failure, lockout) is recorded in `InternalLoginAttempt`:
+
+| Field | Description |
+|-------|-------------|
+| `identifier` | Email or username submitted |
+| `outcome` | `success` \| `failure` \| `locked` |
+| `failure_reason` | Machine-readable reason (never exposed to client) |
+| `user` | Resolved user (null if not found) |
+| `company_id` | Resolved company (null if not resolved) |
+| `ip_address` | Client IP |
+| `user_agent` | HTTP User-Agent |
+| `created_at` | Timestamp |
+
+---
+
+### 3. Account — `/api/v1/account/`
 
 #### GET/PUT/PATCH `/api/v1/account/profile/`
 **Auth:** Bearer Token
@@ -300,7 +472,7 @@ Returns paginated list of active users.
 
 ---
 
-### 3. Access Control — `/api/v1/access-control/`
+### 4. Access Control — `/api/v1/access-control/`
 
 #### Permissions
 
@@ -392,7 +564,7 @@ Returns paginated list of active users.
 
 ---
 
-### 4. Company — `/api/v1/company/`
+### 5. Company — `/api/v1/company/`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -402,7 +574,7 @@ Returns paginated list of active users.
 
 ---
 
-### 5. HRIS Core — `/api/v1/hris/core/`
+### 6. HRIS Core — `/api/v1/hris/core/`
 
 #### Employees
 
@@ -484,7 +656,7 @@ Returns paginated list of active users.
 
 ---
 
-### 6. Recruitment — `/api/v1/hris/recruitment/`
+### 7. Recruitment — `/api/v1/hris/recruitment/`
 
 All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus custom actions.
 
@@ -701,7 +873,7 @@ All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus
 
 ---
 
-### 6.1 New Recruitment Endpoints (v1.1)
+### 7.1 New Recruitment Endpoints (v1.1)
 
 All endpoints below are under `/api/v1/hris/recruitment/`.
 
@@ -1091,7 +1263,7 @@ Added `birth_certificate` to the `doc_type` choices:
 
 ---
 
-### 7. Audit — `/api/v1/audit/`
+### 8. Audit — `/api/v1/audit/`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -1158,3 +1330,4 @@ GET /api/v1/hris/core/employees/?page=2&page_size=50
 | `forgot_password` | 3 | per hour |
 | `enable_2fa` | 10 | per hour |
 | `password_change` | 10 | per hour |
+| `internal_login` | 10 | per minute |

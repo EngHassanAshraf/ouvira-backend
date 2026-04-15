@@ -97,6 +97,7 @@ backend/apps/
 │
 ├── hris/
 │   ├── hris_core/         # Employee, Department, Position, Location, Organization
+│   ├── internal_auth/     # Internal company login, enriched JWT, permission resolver
 │   ├── leave_management/  # Leave requests and approvals
 │   ├── recruitment/       # Hiring requests, candidates, job applications, interviews
 │   ├── travel_management/ # Travel requests and approvals
@@ -125,7 +126,8 @@ All endpoints are versioned under `/api/v1/`:
 
 | Domain | Base Path |
 |--------|-----------|
-| Authentication & 2FA | `/api/v1/auth/` |
+| Authentication & 2FA (external) | `/api/v1/auth/` |
+| Internal company authentication | `/api/v1/hris/internal/auth/` |
 | User account & profile | `/api/v1/account/` |
 | Roles, permissions, invitations | `/api/v1/access-control/` |
 | Company management | `/api/v1/company/` |
@@ -152,6 +154,16 @@ See [api_documentation.md](api_documentation.md) for full endpoint reference.
 - Password reset via email
 - Session management and token blacklisting
 - Cloudflare Turnstile integration
+
+### Internal Company Authentication
+- Separate login flow for employees and staff (`POST /api/v1/hris/internal/auth/login/`)
+- Enriched JWT payload: `company_id`, `employee_id`, `roles`, `permissions`, `modules`
+- Role-based redirect: maps highest-priority role to default frontend module + path
+- Covers all ERP modules: admin, hr, payroll, finance, inventory, procurement, sales, projects, IT, legal, marketing, operations, self-service
+- Account lockout: 5 failed attempts → 30-min lock
+- Full audit trail: every attempt (success/failure/locked) logged to `InternalLoginAttempt`
+- Redis-cached permission resolution (5-min TTL, per user+company)
+- Zero DB queries on `/me/` endpoint — reads JWT claims directly
 
 ### Multi-Tenancy
 - Schema-based tenant isolation
