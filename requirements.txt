@@ -29,6 +29,7 @@ pyotp==2.9.0
 celery==5.6.3
 redis==7.4.0
 django-celery-beat==2.9.0
+django-redis==5.4.0
 
 # --- HTTP & Networking ---
 requests==2.33.0
@@ -66,6 +67,9 @@ vonage==4.7.2
 PyYAML==6.0.3
 pytz==2025.2
 typing_extensions==4.15.0
+
+# --- Excel/CSV Import ---
+openpyxl==3.1.5
 
 # --- Type Stubs (dev/CI only — safe to exclude in prod image) ---
 django-stubs==5.2.8

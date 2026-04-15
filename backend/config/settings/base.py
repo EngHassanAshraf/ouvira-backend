@@ -324,3 +324,33 @@ CELERY_BEAT_SCHEDULE = {
 
 # === GEOIP (MaxMind GeoLite2 offline DB path) ===
 GEOIP_PATH = os.path.join(BASE_DIR, "geoip", "GeoLite2-City.mmdb")
+
+
+# === CACHE ===
+# Redis is required for correct throttling and OTP lockout behavior in
+# multi-worker deployments. The default LocMemCache is per-process and
+# does NOT share state across Gunicorn workers or Celery workers.
+#
+# DRF throttling uses django.core.cache.cache — if this is LocMemCache,
+# each worker has its own counter and rate limits are effectively multiplied
+# by the number of workers (e.g. 4 workers × 5/min = 20 effective req/min).
+#
+# OTP attempt locking (Redis-based in OTPService) is already correct, but
+# DRF's ScopedRateThrottle for otp_verify is a secondary backstop that also
+# needs Redis to be consistent.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.getenv("REDIS_URL", "redis://redis:6379/1"),
+        # Use DB 1 for cache (DB 0 is Celery broker/result backend)
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+        "KEY_PREFIX": "ouvira",
+        "TIMEOUT": 300,  # 5 minutes default TTL
+    }
+}
+
+# Session engine — use cache-backed sessions for multi-worker consistency
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"

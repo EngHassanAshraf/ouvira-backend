@@ -1,6 +1,18 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers as drf_serializers
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from .permissions import (
+    IsRecruitmentViewer,
+    IsHROrAdmin,
+    CanApproveHiringRequest,
+    CanManageJobAdvertisements,
+    CanManageCandidates,
+    CanManageInterviews,
+    CanManageOffers,
+    CanManagePostProbation,
+)
 
 from .serializers import (
     HiringRequestSerializer,
@@ -60,13 +72,23 @@ class HiringRequestViewSet(viewsets.ModelViewSet):
 
     Lifecycle:
       draft → [submit] → submitted → [approve/reject] → approved | rejected
-      draft | submitted → [cancel] → rejected (terminal)
+      draft | submitted → [cancel] → cancelled (terminal)
 
     Edit rules (enforced by service):
       - PUT/PATCH: only allowed on DRAFT requests.
       - DELETE:    only allowed on DRAFT requests (soft delete).
     """
     queryset = HiringRequest.objects.all()
+    permission_classes = [IsAuthenticated, IsHROrAdmin]
+
+    def get_permissions(self):
+        # Approve/reject actions require the broader approver role set
+        if self.action in ("approve", "reject", "bulk_approve", "bulk_reject"):
+            return [IsAuthenticated(), CanApproveHiringRequest()]
+        # Read-only actions open to all recruitment viewers
+        if self.action in ("list", "retrieve", "approval_flow"):
+            return [IsAuthenticated(), IsRecruitmentViewer()]
+        return super().get_permissions()
 
     def get_serializer_class(self):
         if self.action in ("update", "partial_update"):
@@ -113,7 +135,9 @@ class HiringRequestViewSet(viewsets.ModelViewSet):
                 data=serializer.validated_data,
             )
         except ValueError as e:
-            raise serializer.ValidationError({"detail": str(e)})
+            # Bug fix: was serializer.ValidationError (instance attr) — must be
+            # the module-level drf_serializers.ValidationError
+            raise drf_serializers.ValidationError({"detail": str(e)})
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
@@ -275,6 +299,12 @@ class JobAdvertisementViewSet(viewsets.ModelViewSet):
       - DELETE:                 only DRAFT ads can be deleted (soft delete).
     """
     queryset = JobAdvertisement.objects.all()
+    permission_classes = [IsAuthenticated, CanManageJobAdvertisements]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated(), IsRecruitmentViewer()]
+        return super().get_permissions()
 
     def get_serializer_class(self):
         if self.action in ("update", "partial_update"):
@@ -395,6 +425,12 @@ class CandidateViewSet(viewsets.ModelViewSet):
     """CRUD for Candidates, with optional name/email search."""
     serializer_class = CandidateSerializer
     queryset = Candidate.objects.all()
+    permission_classes = [IsAuthenticated, CanManageCandidates]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated(), IsRecruitmentViewer()]
+        return super().get_permissions()
 
     def get_queryset(self):
         cid = _company_id(self.request)
@@ -410,6 +446,12 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
     """CRUD + move-to-stage action for the Kanban pipeline."""
     serializer_class = JobApplicationSerializer
     queryset = JobApplication.objects.all()
+    permission_classes = [IsAuthenticated, CanManageCandidates]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated(), IsRecruitmentViewer()]
+        return super().get_permissions()
 
     def get_queryset(self):
         cid = _company_id(self.request)
@@ -491,6 +533,12 @@ class InterviewViewSet(viewsets.ModelViewSet):
     """CRUD + record-result action for Interviews."""
     serializer_class = InterviewSerializer
     queryset = Interview.objects.all()
+    permission_classes = [IsAuthenticated, CanManageInterviews]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated(), IsRecruitmentViewer()]
+        return super().get_permissions()
 
     def get_queryset(self):
         application_id = self.request.query_params.get("application")
@@ -537,6 +585,12 @@ class CandidateDocumentViewSet(viewsets.ModelViewSet):
     """CRUD + verify action for Candidate Documents."""
     serializer_class = CandidateDocumentSerializer
     queryset = CandidateDocument.objects.all()
+    permission_classes = [IsAuthenticated, CanManageCandidates]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated(), IsRecruitmentViewer()]
+        return super().get_permissions()
 
     def get_queryset(self):
         candidate_id = self.request.query_params.get("candidate")
@@ -568,6 +622,12 @@ class JobOfferViewSet(viewsets.ModelViewSet):
     """CRUD + accept/decline actions for Job Offers."""
     serializer_class = JobOfferSerializer
     queryset = JobOffer.objects.all()
+    permission_classes = [IsAuthenticated, CanManageOffers]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated(), IsRecruitmentViewer()]
+        return super().get_permissions()
 
     def get_queryset(self):
         cid = _company_id(self.request)
@@ -614,6 +674,12 @@ class OnboardingViewSet(viewsets.ModelViewSet):
     """CRUD for Onboarding checklists."""
     serializer_class = OnboardingSerializer
     queryset = Onboarding.objects.all()
+    permission_classes = [IsAuthenticated, IsHROrAdmin]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated(), IsRecruitmentViewer()]
+        return super().get_permissions()
 
     def get_queryset(self):
         cid = _company_id(self.request)
@@ -681,6 +747,12 @@ class RecruitmentAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
 class PostProbationEvaluationViewSet(viewsets.ModelViewSet):
     """CRUD + workflow actions for Post-Probation Evaluations."""
+    permission_classes = [IsAuthenticated, CanManagePostProbation]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated(), IsRecruitmentViewer()]
+        return super().get_permissions()
 
     def get_serializer_class(self):
         from .serializers import PostProbationEvaluationSerializer

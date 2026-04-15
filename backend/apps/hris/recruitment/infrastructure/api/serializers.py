@@ -10,18 +10,43 @@ from apps.audit.models import ActivityLog
 User = get_user_model()
 
 
+def _user_display_name(user):
+    """
+    Return the best available display name for a user.
+    CustomUser has a `full_name` CharField; fall back to username.
+    """
+    if user is None:
+        return None
+    return getattr(user, "full_name", None) or user.get_full_name() or user.username
+
+
+def _candidate_full_name(candidate):
+    """
+    Candidate has first_name + last_name, no full_name field.
+    """
+    if candidate is None:
+        return None
+    return f"{candidate.first_name} {candidate.last_name}".strip()
+
+
 class HiringRequestApprovalSerializer(serializers.ModelSerializer):
-    approver_name = serializers.CharField(source="approver.get_full_name", read_only=True)
+    # Use SerializerMethodField — approver is nullable and CustomUser.full_name
+    # is the correct field (not get_full_name() which returns first+last).
+    approver_name = serializers.SerializerMethodField()
 
     class Meta:
         model = HiringRequestApproval
         fields = ["id", "approver", "approver_name", "role_type", "status", "note", "action_at", "created_at"]
         read_only_fields = ["id", "created_at"]
 
+    def get_approver_name(self, obj):
+        return _user_display_name(obj.approver)
+
 
 class HiringRequestSerializer(serializers.ModelSerializer):
     approvals = HiringRequestApprovalSerializer(many=True, read_only=True)
-    created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+    # CustomUser.full_name is a CharField — direct attribute access is correct.
+    created_by_name = serializers.CharField(source="created_by.full_name", read_only=True)
     job_title_name = serializers.CharField(source="job_title.title", read_only=True)
     department_name = serializers.CharField(source="department.name", read_only=True)
 
@@ -106,9 +131,6 @@ class JobAdvertisementUpdateSerializer(serializers.ModelSerializer):
     - DRAFT: all content fields are writable.
     - PUBLISHED: only deadline and platforms are writable (enforced in the service).
     - CLOSED: no updates allowed (enforced in the service).
-
-    The serializer accepts all editable fields; the service enforces
-    state-based restrictions so the error message is business-meaningful.
     """
     class Meta:
         model = JobAdvertisement
@@ -137,19 +159,23 @@ class JobAdvertisementUpdateSerializer(serializers.ModelSerializer):
 class CandidateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Candidate
-        fields = ["id", "first_name", "last_name", "email", "phone", "linkedin_url", "photo", "cv_file", "source", "company", "created_at"]
+        fields = [
+            "id", "first_name", "last_name", "email", "phone",
+            "linkedin_url", "photo", "cv_file", "source", "company", "created_at",
+        ]
         read_only_fields = ["id", "created_at"]
 
 
-# Task 13: Updated JobApplicationSerializer with job_board field
 class JobApplicationSerializer(serializers.ModelSerializer):
     candidate_details = CandidateSerializer(source="candidate", read_only=True)
     job_title = serializers.CharField(source="job_advertisement.title", read_only=True)
 
     class Meta:
         model = JobApplication
-        fields = ["id", "candidate", "candidate_details", "job_advertisement", "job_title",
-                  "status", "classification", "job_board", "applied_at", "notes"]
+        fields = [
+            "id", "candidate", "candidate_details", "job_advertisement", "job_title",
+            "status", "classification", "job_board", "applied_at", "notes",
+        ]
         read_only_fields = ["id", "applied_at"]
 
     def validate_job_board(self, value):
@@ -162,7 +188,6 @@ class JobApplicationSerializer(serializers.ModelSerializer):
         return value
 
 
-# Task 14.2: InterviewerScoreSerializer (must be defined before InterviewSerializer)
 class InterviewerScoreSerializer(serializers.Serializer):
     interviewer_id = serializers.IntegerField()
     score = serializers.FloatField(min_value=0, max_value=10)
@@ -174,10 +199,10 @@ class InterviewerScoreSerializer(serializers.Serializer):
         return value
 
 
-# Task 14: Updated InterviewSerializer with call_status and validate_scoring_data
 class InterviewSerializer(serializers.ModelSerializer):
     interviewer_names = serializers.SerializerMethodField()
-    candidate_name = serializers.CharField(source="application.candidate.full_name", read_only=True)
+    # Candidate has first_name + last_name, no full_name field — use method.
+    candidate_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
@@ -188,8 +213,11 @@ class InterviewSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "average_score", "created_at"]
 
+    def get_candidate_name(self, obj):
+        return _candidate_full_name(obj.application.candidate)
+
     def get_interviewer_names(self, obj):
-        return [user.get_full_name() or user.username for user in obj.interviewers.all()]
+        return [_user_display_name(u) for u in obj.interviewers.all()]
 
     def validate_scoring_data(self, value):
         if isinstance(value, list):
@@ -205,9 +233,9 @@ class CandidateDocumentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
-# Task 15: Updated JobOfferSerializer with offer_validity_date and cross-field validation
 class JobOfferSerializer(serializers.ModelSerializer):
-    candidate_name = serializers.CharField(source="application.candidate.full_name", read_only=True)
+    # Candidate has no full_name — use method.
+    candidate_name = serializers.SerializerMethodField()
     job_title = serializers.CharField(source="application.job_advertisement.title", read_only=True)
 
     class Meta:
@@ -219,9 +247,14 @@ class JobOfferSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "status", "responded_at", "created_at"]
 
+    def get_candidate_name(self, obj):
+        return _candidate_full_name(obj.application.candidate)
+
     def validate(self, data):
         start = data.get("start_date") or (self.instance.start_date if self.instance else None)
-        validity = data.get("offer_validity_date") or (self.instance.offer_validity_date if self.instance else None)
+        validity = data.get("offer_validity_date") or (
+            self.instance.offer_validity_date if self.instance else None
+        )
         if start and validity and validity < start:
             raise serializers.ValidationError(
                 {"offer_validity_date": "offer_validity_date must be on or after start_date."}
@@ -229,9 +262,9 @@ class JobOfferSerializer(serializers.ModelSerializer):
         return data
 
 
-# Task 16: Updated OnboardingSerializer with 7 new fields and validate_engagement_level
 class OnboardingSerializer(serializers.ModelSerializer):
-    candidate_name = serializers.CharField(source="candidate.full_name", read_only=True)
+    # Candidate has no full_name — use method.
+    candidate_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Onboarding
@@ -243,13 +276,15 @@ class OnboardingSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at"]
 
+    def get_candidate_name(self, obj):
+        return _candidate_full_name(obj.candidate)
+
     def validate_engagement_level(self, value):
         if value is not None and not (1 <= value <= 5):
             raise serializers.ValidationError("engagement_level must be between 1 and 5.")
         return value
 
 
-# Task 17.1: ApprovalFlowSerializer — read-only
 class ApprovalFlowSerializer(serializers.ModelSerializer):
     approver_name = serializers.SerializerMethodField()
 
@@ -259,12 +294,9 @@ class ApprovalFlowSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "role_type", "approver", "approver_name", "status", "action_at", "note", "created_at"]
 
     def get_approver_name(self, obj):
-        if obj.approver:
-            return obj.approver.get_full_name() or obj.approver.username
-        return None
+        return _user_display_name(obj.approver)
 
 
-# Task 17.2: ImportSummarySerializer — read-only
 class ImportErrorSerializer(serializers.Serializer):
     row = serializers.IntegerField()
     error = serializers.CharField()
@@ -279,7 +311,6 @@ class ImportSummarySerializer(serializers.Serializer):
     imported_at = serializers.DateTimeField()
 
 
-# Task 17.3: SyncResultSerializer — read-only
 class SyncResultSerializer(serializers.Serializer):
     synced = serializers.IntegerField()
     skipped_duplicates = serializers.IntegerField()
@@ -287,7 +318,6 @@ class SyncResultSerializer(serializers.Serializer):
     synced_at = serializers.DateTimeField()
 
 
-# Task 17.4: ActivityLogSerializer — read-only
 class ActivityLogSerializer(serializers.ModelSerializer):
     performed_by_name = serializers.SerializerMethodField()
     performed_by_id = serializers.IntegerField(source="user_id", read_only=True)
@@ -297,18 +327,16 @@ class ActivityLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = ActivityLog
         ref_name = "RecruitmentActivityLog"
-        fields = ["id", "action", "entity_type", "entity_id",
-                  "performed_by_name", "performed_by_id", "timestamp", "details"]
-        read_only_fields = ["id", "action", "entity_type", "entity_id",
-                            "performed_by_name", "performed_by_id", "timestamp", "details"]
+        fields = [
+            "id", "action", "entity_type", "entity_id",
+            "performed_by_name", "performed_by_id", "timestamp", "details",
+        ]
+        read_only_fields = fields
 
     def get_performed_by_name(self, obj):
-        if obj.user:
-            return obj.user.get_full_name() or obj.user.username
-        return None
+        return _user_display_name(obj.user)
 
 
-# Task 17.5: PostProbationEvaluationSerializer — full CRUD
 class PostProbationEvaluationSerializer(serializers.ModelSerializer):
     evaluated_by_name = serializers.SerializerMethodField()
 
@@ -326,9 +354,7 @@ class PostProbationEvaluationSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "average_score", "workflow_status", "created_at", "updated_at"]
 
     def get_evaluated_by_name(self, obj):
-        if obj.evaluated_by:
-            return obj.evaluated_by.get_full_name() or obj.evaluated_by.username
-        return None
+        return _user_display_name(obj.evaluated_by)
 
     def validate_tasks_score(self, value):
         if value is not None and not (1 <= value <= 5):
