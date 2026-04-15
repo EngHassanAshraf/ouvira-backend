@@ -345,10 +345,7 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": os.getenv("REDIS_URL", "redis://redis:6379/1"),
-        # Use DB 1 for cache (DB 0 is Celery broker/result backend)
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        },
+        # DB 1 for cache — DB 0 is Celery broker/result backend
         "KEY_PREFIX": "ouvira",
         "TIMEOUT": 300,  # 5 minutes default TTL
     }
