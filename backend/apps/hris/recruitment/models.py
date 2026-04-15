@@ -10,6 +10,7 @@ class HiringRequest(TimeStampedModel, SoftDeleteModel):
         SUBMITTED = "submitted", _("Submitted")
         APPROVED = "approved", _("Approved")
         REJECTED = "rejected", _("Rejected")
+        CANCELLED = "cancelled", _("Cancelled")
 
     company = models.ForeignKey("company.Company", on_delete=models.CASCADE, related_name="hiring_requests")
     job_title = models.ForeignKey("hris_core.JobTitle", on_delete=models.PROTECT, related_name="hiring_requests")
@@ -75,7 +76,7 @@ class JobAdvertisement(TimeStampedModel, SoftDeleteModel):
 class Candidate(TimeStampedModel, SoftDeleteModel):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
+    email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True, null=True)
     linkedin_url = models.URLField(blank=True, null=True)
     photo = models.ImageField(upload_to="candidates/photos/", blank=True, null=True)
@@ -85,6 +86,8 @@ class Candidate(TimeStampedModel, SoftDeleteModel):
 
     class Meta:
         db_table = "hris_recruitment_candidates"
+        # Email must be unique per company, not globally — multi-tenant safe
+        unique_together = [("company", "email")]
 
 
 class JobApplication(TimeStampedModel, SoftDeleteModel):

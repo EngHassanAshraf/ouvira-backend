@@ -221,7 +221,9 @@ class HiringRequestViewSet(viewsets.ModelViewSet):
             return Response({"detail": "role_type is required."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             from ...application.services.bulk_action_service import BulkActionService
-            result = BulkActionService.bulk_approve_hiring_requests(ids, request.user, role_type, note)
+            result = BulkActionService.bulk_approve_hiring_requests(
+                ids, request.user, role_type, note, company_id=_company_id(request)
+            )
             return Response(result)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -236,7 +238,9 @@ class HiringRequestViewSet(viewsets.ModelViewSet):
             return Response({"detail": "role_type and reason are required."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             from ...application.services.bulk_action_service import BulkActionService
-            result = BulkActionService.bulk_reject_hiring_requests(ids, request.user, role_type, reason)
+            result = BulkActionService.bulk_reject_hiring_requests(
+                ids, request.user, role_type, reason, company_id=_company_id(request)
+            )
             return Response(result)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -247,7 +251,9 @@ class HiringRequestViewSet(viewsets.ModelViewSet):
         ids = request.data.get("ids", [])
         try:
             from ...application.services.bulk_action_service import BulkActionService
-            result = BulkActionService.bulk_delete_hiring_requests(ids, request.user)
+            result = BulkActionService.bulk_delete_hiring_requests(
+                ids, request.user, company_id=_company_id(request)
+            )
             return Response(result)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -362,7 +368,9 @@ class JobAdvertisementViewSet(viewsets.ModelViewSet):
         ids = request.data.get("ids", [])
         try:
             from ...application.services.bulk_action_service import BulkActionService
-            result = BulkActionService.bulk_publish_advertisements(ids, request.user)
+            result = BulkActionService.bulk_publish_advertisements(
+                ids, request.user, company_id=_company_id(request)
+            )
             return Response(result)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -373,7 +381,9 @@ class JobAdvertisementViewSet(viewsets.ModelViewSet):
         ids = request.data.get("ids", [])
         try:
             from ...application.services.bulk_action_service import BulkActionService
-            result = BulkActionService.bulk_close_advertisements(ids, request.user)
+            result = BulkActionService.bulk_close_advertisements(
+                ids, request.user, company_id=_company_id(request)
+            )
             return Response(result)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -467,7 +477,9 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
             return Response({"detail": "classification is required."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             from ...application.services.bulk_action_service import BulkActionService
-            result = BulkActionService.bulk_edit_applications(ids, request.user, classification)
+            result = BulkActionService.bulk_edit_applications(
+                ids, request.user, classification, company_id=_company_id(request)
+            )
             return Response(result)
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)

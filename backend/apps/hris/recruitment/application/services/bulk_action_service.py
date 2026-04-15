@@ -1,9 +1,17 @@
 """
 BulkActionService — processes bulk operations on recruitment entities.
-Returns partial-success responses: {"success": [ids], "failed": [{"id": x, "error": "..."}]}
+
+Returns partial-success responses:
+    {"success": [ids], "failed": [{"id": x, "error": "..."}]}
+
 Max 100 IDs per call.
+
+Company isolation: company_id is passed explicitly from the view layer
+(resolved via _company_id(request) → tenant id). Never derived from user
+attributes, which are not reliable.
 """
 import logging
+
 from ...models import HiringRequest, JobAdvertisement, JobApplication
 from .hiring_request_service import HiringRequestService
 from .job_advertisement_service import JobAdvertisementService
@@ -27,109 +35,124 @@ class BulkActionService:
     def _build_result(success, failed):
         return {"success": success, "failed": failed}
 
+    # ── Hiring Requests ────────────────────────────────────────────────────────
+
     @staticmethod
-    def bulk_approve_hiring_requests(ids, user, role_type, note=""):
+    def bulk_approve_hiring_requests(ids, user, role_type, note="", company_id=None):
         BulkActionService._validate_ids(ids)
         success, failed = [], []
-        company_id = getattr(getattr(user, 'company', None), 'id', None) or getattr(user, 'company_id', None)
         for rid in ids:
             try:
-                hr = HiringRequest.objects.get(pk=rid)
-                if company_id and str(hr.company_id) != str(company_id):
-                    failed.append({"id": rid, "error": "Not found in your company."})
-                    continue
-                HiringRequestService.approve_request(rid, user, role_type, note)
+                if company_id:
+                    hr = HiringRequest.objects.get(pk=rid, company_id=company_id)
+                else:
+                    hr = HiringRequest.objects.get(pk=rid)
+                HiringRequestService.approve_request(hr.pk, user, role_type, note)
                 success.append(rid)
+            except HiringRequest.DoesNotExist:
+                failed.append({"id": rid, "error": "Not found in your company."})
             except Exception as e:
                 failed.append({"id": rid, "error": str(e)})
         return BulkActionService._build_result(success, failed)
 
     @staticmethod
-    def bulk_reject_hiring_requests(ids, user, role_type, reason):
+    def bulk_reject_hiring_requests(ids, user, role_type, reason, company_id=None):
         BulkActionService._validate_ids(ids)
         success, failed = [], []
-        company_id = getattr(getattr(user, 'company', None), 'id', None) or getattr(user, 'company_id', None)
         for rid in ids:
             try:
-                hr = HiringRequest.objects.get(pk=rid)
-                if company_id and str(hr.company_id) != str(company_id):
-                    failed.append({"id": rid, "error": "Not found in your company."})
-                    continue
-                HiringRequestService.reject_request(rid, user, role_type, reason)
+                if company_id:
+                    hr = HiringRequest.objects.get(pk=rid, company_id=company_id)
+                else:
+                    hr = HiringRequest.objects.get(pk=rid)
+                HiringRequestService.reject_request(hr.pk, user, role_type, reason)
                 success.append(rid)
+            except HiringRequest.DoesNotExist:
+                failed.append({"id": rid, "error": "Not found in your company."})
             except Exception as e:
                 failed.append({"id": rid, "error": str(e)})
         return BulkActionService._build_result(success, failed)
 
     @staticmethod
-    def bulk_delete_hiring_requests(ids, user):
+    def bulk_delete_hiring_requests(ids, user, company_id=None):
         BulkActionService._validate_ids(ids)
         success, failed = [], []
-        company_id = getattr(getattr(user, 'company', None), 'id', None) or getattr(user, 'company_id', None)
         for rid in ids:
             try:
-                hr = HiringRequest.objects.get(pk=rid)
-                if company_id and str(hr.company_id) != str(company_id):
-                    failed.append({"id": rid, "error": "Not found in your company."})
-                    continue
-                HiringRequestService.soft_delete_hiring_request(rid, user)
+                if company_id:
+                    hr = HiringRequest.objects.get(pk=rid, company_id=company_id)
+                else:
+                    hr = HiringRequest.objects.get(pk=rid)
+                HiringRequestService.soft_delete_hiring_request(hr.pk, user)
                 success.append(rid)
+            except HiringRequest.DoesNotExist:
+                failed.append({"id": rid, "error": "Not found in your company."})
             except Exception as e:
                 failed.append({"id": rid, "error": str(e)})
         return BulkActionService._build_result(success, failed)
 
+    # ── Job Advertisements ─────────────────────────────────────────────────────
+
     @staticmethod
-    def bulk_publish_advertisements(ids, user):
+    def bulk_publish_advertisements(ids, user, company_id=None):
         BulkActionService._validate_ids(ids)
         success, failed = [], []
-        company_id = getattr(getattr(user, 'company', None), 'id', None) or getattr(user, 'company_id', None)
         for aid in ids:
             try:
-                ad = JobAdvertisement.objects.select_related("hiring_request__company").get(pk=aid)
-                if company_id and str(ad.hiring_request.company_id) != str(company_id):
-                    failed.append({"id": aid, "error": "Not found in your company."})
-                    continue
-                JobAdvertisementService.publish_advertisement(aid, user)
+                qs = JobAdvertisement.objects.select_related("hiring_request")
+                if company_id:
+                    ad = qs.get(pk=aid, hiring_request__company_id=company_id)
+                else:
+                    ad = qs.get(pk=aid)
+                JobAdvertisementService.publish_advertisement(ad.pk, user)
                 success.append(aid)
+            except JobAdvertisement.DoesNotExist:
+                failed.append({"id": aid, "error": "Not found in your company."})
             except Exception as e:
                 failed.append({"id": aid, "error": str(e)})
         return BulkActionService._build_result(success, failed)
 
     @staticmethod
-    def bulk_close_advertisements(ids, user):
+    def bulk_close_advertisements(ids, user, company_id=None):
         BulkActionService._validate_ids(ids)
         success, failed = [], []
-        company_id = getattr(getattr(user, 'company', None), 'id', None) or getattr(user, 'company_id', None)
         for aid in ids:
             try:
-                ad = JobAdvertisement.objects.select_related("hiring_request__company").get(pk=aid)
-                if company_id and str(ad.hiring_request.company_id) != str(company_id):
-                    failed.append({"id": aid, "error": "Not found in your company."})
-                    continue
-                JobAdvertisementService.close_advertisement(aid, user)
+                qs = JobAdvertisement.objects.select_related("hiring_request")
+                if company_id:
+                    ad = qs.get(pk=aid, hiring_request__company_id=company_id)
+                else:
+                    ad = qs.get(pk=aid)
+                JobAdvertisementService.close_advertisement(ad.pk, user)
                 success.append(aid)
+            except JobAdvertisement.DoesNotExist:
+                failed.append({"id": aid, "error": "Not found in your company."})
             except Exception as e:
                 failed.append({"id": aid, "error": str(e)})
         return BulkActionService._build_result(success, failed)
 
+    # ── Job Applications ───────────────────────────────────────────────────────
+
     @staticmethod
-    def bulk_edit_applications(ids, user, classification):
+    def bulk_edit_applications(ids, user, classification, company_id=None):
         BulkActionService._validate_ids(ids)
         valid_choices = [c[0] for c in JobApplication.Classification.choices]
         if classification not in valid_choices:
-            raise ValueError(f"Invalid classification '{classification}'. Must be one of: {valid_choices}")
+            raise ValueError(
+                f"Invalid classification '{classification}'. Must be one of: {valid_choices}"
+            )
         success, failed = [], []
-        company_id = getattr(getattr(user, 'company', None), 'id', None) or getattr(user, 'company_id', None)
         for app_id in ids:
             try:
-                app = JobApplication.objects.select_related(
-                    "candidate", "job_advertisement__hiring_request__company"
-                ).get(pk=app_id)
-                if company_id and str(app.candidate.company_id) != str(company_id):
-                    failed.append({"id": app_id, "error": "Not found in your company."})
-                    continue
-                ApplicationService.move_to_stage(app_id, app.status, user, classification)
+                qs = JobApplication.objects.select_related("candidate")
+                if company_id:
+                    app = qs.get(pk=app_id, candidate__company_id=company_id)
+                else:
+                    app = qs.get(pk=app_id)
+                ApplicationService.move_to_stage(app.pk, app.status, user, classification)
                 success.append(app_id)
+            except JobApplication.DoesNotExist:
+                failed.append({"id": app_id, "error": "Not found in your company."})
             except Exception as e:
                 failed.append({"id": app_id, "error": str(e)})
         return BulkActionService._build_result(success, failed)

@@ -133,7 +133,7 @@ class HiringRequestService:
             )
 
         old_status = hiring_request.status
-        hiring_request.status = HiringRequest.Status.REJECTED  # reuse REJECTED as cancelled
+        hiring_request.status = HiringRequest.Status.CANCELLED
         hiring_request.save()
 
         # Mark any pending approvals as rejected

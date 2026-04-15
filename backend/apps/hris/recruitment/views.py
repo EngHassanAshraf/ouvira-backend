@@ -1,3 +1,3 @@
-from django.shortcuts import render
-
-# Create your views here.
+# This file is intentionally empty.
+# All recruitment API views live in:
+#   infrastructure/api/views.py
