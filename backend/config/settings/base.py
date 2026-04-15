@@ -60,6 +60,7 @@ TENANT_CREATED_APPS = (
     'apps.hris.performance',
     'apps.hris.termination',
     'apps.hris.analytics',
+    'apps.hris.internal_auth',
 )
 
 TENANT_THIRD_PARTY = ()
@@ -118,6 +119,8 @@ REST_FRAMEWORK = {
         "otp_send": "1/m",
         "forgot_password": "3/h",
         "password_change": "10/h",
+        # Internal auth
+        "internal_login": "10/m",
     },
 }
 

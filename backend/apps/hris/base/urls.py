@@ -27,4 +27,6 @@ urlpatterns = [
     path("performance/", include("apps.hris.performance.urls",                      namespace="performance")),
     path("analytics/",   include("apps.hris.analytics.urls",                        namespace="analytics")),
     path("termination/", include("apps.hris.termination.urls",                      namespace="termination")),
+    # Internal company authentication (separate from external/tenant auth)
+    path("internal/auth/", include("apps.hris.internal_auth.api.urls",             namespace="internal_auth")),
 ]
