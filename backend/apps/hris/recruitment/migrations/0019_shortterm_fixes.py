@@ -10,7 +10,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("recruitment", "0018_delete_applicant_delete_jobpost"),
+        ("hris_recruitment", "0018_delete_applicant_delete_jobpost"),
     ]
 
     operations = [
