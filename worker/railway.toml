@@ -1,8 +1,9 @@
 [build]
-builder = "nixpacks"
-buildCommand = "pip install -r ../requirements.txt"
+builder = "dockerfile"
+dockerfilePath = "docker/Dockerfile"
+buildArgs = { MAXMIND_LICENSE_KEY = "${{MAXMIND_LICENSE_KEY}}" }
 
-# cache bust: 5
+# cache bust: 9
 
 [deploy]
-startCommand = "cd /app/backend && celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
+startCommand = "cd /app && celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
