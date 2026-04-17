@@ -3,7 +3,7 @@ builder = "dockerfile"
 dockerfilePath = "docker/Dockerfile"
 buildArgs = { MAXMIND_LICENSE_KEY = "${{MAXMIND_LICENSE_KEY}}" }
 
-# cache bust: 10
+# cache bust: 11
 
 [deploy]
 startCommand = "celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
