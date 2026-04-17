@@ -2,7 +2,23 @@
 builder = "nixpacks"
 buildCommand = "pip install -r ../requirements.txt"
 
-# cache bust: 1
+# cache bust: 2
 
 [deploy]
-startCommand = "mkdir -p /app/backend/config/geoip && curl -sL "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" -o /app/backend/config/geoip/GeoLite2-City.tar.gz && tar -xzf /app/backend/config/geoip/GeoLite2-City.tar.gz -C /app/backend/config/geoip && mv /app/backend/config/geoip/GeoLite2-City_*/*.mmdb /app/backend/config/geoip/GeoLite2-City.mmdb && rm -rf /app/backend/config/geoip/GeoLite2-City.tar.gz /app/backend/config/geoip/GeoLite2-City_*/ && cd /app/backend && celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
+startCommand = """
+  set -e &&
+  cd /app/backend &&
+  mkdir -p /app/backend/geoip &&
+  if [ -n "$MAXMIND_LICENSE_KEY" ]; then
+    TMPFILE=$(mktemp) &&
+    curl -Ls --fail "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" -o "$TMPFILE" &&
+    file "$TMPFILE" | grep -q "gzip" &&
+    tar -xz --strip-components=1 -C /app/backend/geoip --wildcards "*.mmdb" -f "$TMPFILE" &&
+    echo "GeoLite2-City downloaded." ||
+    echo "WARNING: GeoIP download failed — continuing without it.";
+    rm -f "$TMPFILE";
+  else
+    echo "MAXMIND_LICENSE_KEY not set — skipping GeoIP download.";
+  fi &&
+  celery -A config worker --loglevel=info --queues=default,fast --concurrency=2
+"""
