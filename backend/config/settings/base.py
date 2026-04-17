@@ -339,6 +339,9 @@ TURNSTILE_BYPASS_TOKEN = os.getenv("TURNSTILE_BYPASS_TOKEN", "")
 
 
 # === CELERY (JSON serializer prevents pickle deserialization attacks) ===
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+REDIS_CACHE_URL = os.getenv("REDIS_CACHE_URL", REDIS_URL)
+
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 CELERY_TASK_SERIALIZER = "json"
@@ -382,9 +385,6 @@ GEOIP_PATH = os.path.join(BASE_DIR, "geoip", "GeoLite2-City.mmdb")
 # OTP attempt locking (Redis-based in OTPService) is already correct, but
 # DRF's ScopedRateThrottle for otp_verify is a secondary backstop that also
 # needs Redis to be consistent.
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
-REDIS_CACHE_URL = os.getenv("REDIS_CACHE_URL", REDIS_URL)
-
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
