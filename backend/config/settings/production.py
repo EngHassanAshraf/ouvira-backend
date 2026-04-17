@@ -16,6 +16,9 @@ if SECRET_KEY and "django-insecure" in SECRET_KEY:
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
+# Railway healthcheck uses a fixed host — always allow it
+ALLOWED_HOSTS += ["healthcheck.railway.app", ".railway.app"]
+
 # CORS — whitelist only trusted origins
 CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "False") == "True"
 CORS_ALLOWED_ORIGINS = [
