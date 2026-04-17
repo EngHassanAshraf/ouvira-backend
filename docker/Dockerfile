@@ -40,13 +40,18 @@ COPY ./docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 ARG MAXMIND_LICENSE_KEY
 RUN mkdir -p /var/opt/geoip && \
     if [ -n "$MAXMIND_LICENSE_KEY" ]; then \
-    echo "Downloading GeoLite2-City..." && \
-    (curl -Ls --fail "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" \
-    | tar -xz --strip-components=1 -C /var/opt/geoip --wildcards "*.mmdb") \
-    && echo "GeoLite2-City downloaded successfully." \
-    || echo "WARNING: GeoLite2-City download failed. GeoIP will use fallback behavior. Check MAXMIND_LICENSE_KEY."; \
+        echo "Downloading GeoLite2-City..." && \
+        TMPFILE=$(mktemp) && \
+        curl -Ls --fail \
+            "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" \
+            -o "$TMPFILE" && \
+        file "$TMPFILE" | grep -q "gzip" && \
+        tar -xz --strip-components=1 -C /var/opt/geoip --wildcards "*.mmdb" -f "$TMPFILE" && \
+        echo "GeoLite2-City downloaded successfully." || \
+        echo "WARNING: GeoLite2-City download failed (invalid key or network error). GeoIP will use fallback behavior."; \
+        rm -f "$TMPFILE"; \
     else \
-    echo "MAXMIND_LICENSE_KEY not set. GeoIP will gracefully fallback."; \
+        echo "MAXMIND_LICENSE_KEY not set. GeoIP will gracefully fallback."; \
     fi
 
 # Fix permissions
