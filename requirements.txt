@@ -42,7 +42,7 @@ python-dotenv==1.2.1
 packaging==25.0
 
 # --- CORS ---
-django-cors-headers==4.7.2
+django-cors-headers==4.6.0
 
 # --- IP & Geo ---
 django-ipware==7.0.1

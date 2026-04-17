@@ -1,3 +1,2 @@
 from .location_selectors import LocationSelector
 from .organization_selectors import OrganizationSelector
-from .organization_selectors import OrganizationSelector

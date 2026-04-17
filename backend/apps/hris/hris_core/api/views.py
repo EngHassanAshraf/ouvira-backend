@@ -323,7 +323,7 @@ class EmploymentListCreateApiView(APIView):
     def get_permissions(self):
         if self.request.method == "GET":
             return [IsAuthenticated()]
-        return [IsAuthenticated, IsAdminUser()]
+        return [IsAuthenticated(), IsAdminUser()]
 
     def get(self, request, employee_pk):
         employments = EmploymentSelector.get_by_employee(
