@@ -2,7 +2,7 @@
 builder = "nixpacks"
 buildCommand = "pip install -r ../requirements.txt"
 
-# cache bust: 4
+# cache bust: 5
 
 [deploy]
-startCommand = "chmod +x ../docker/download_geoip.sh && ../docker/download_geoip.sh /app/backend/geoip && cd /app/backend && celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
+startCommand = "cd /app/backend && celery -A config worker --loglevel=info --queues=default,fast --concurrency=2"
