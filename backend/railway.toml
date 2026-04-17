@@ -2,8 +2,8 @@
 builder = "nixpacks"
 buildCommand = "pip install -r ../requirements.txt"
 
-# cache bust: 4
+# cache bust: 6
 
 [deploy]
-startCommand = "chmod +x ../docker/download_geoip.sh && ../docker/download_geoip.sh /app/backend/geoip && cd /app/backend && python manage.py migrate_schemas --shared && gunicorn config.wsgi:application --config gunicorn.conf.py"
+startCommand = "cd /app/backend && python manage.py migrate_schemas --shared && gunicorn config.wsgi:application --config gunicorn.conf.py"
 healthcheckPath = "/health/"
