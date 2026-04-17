@@ -32,28 +32,18 @@ RUN pip install --no-cache /wheels/*.whl
 # Copy backend application source
 COPY ./backend .
 
-# Copy entrypoint
+# Copy entrypoint and GeoIP helper
 COPY ./docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY ./docker/download_geoip.sh /usr/local/bin/download_geoip.sh
 
 # Download GeoLite2-City at build time into an immutable layer immune to volume mounts
 # This step is optional - the application will gracefully handle missing GeoIP database
 ARG MAXMIND_LICENSE_KEY
-RUN mkdir -p /var/opt/geoip && \
-    if [ -n "$MAXMIND_LICENSE_KEY" ]; then \
-        TMPFILE=/tmp/geoip_$$.tar.gz && \
-        curl -Ls --fail \
-            "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" \
-            -o "$TMPFILE" && \
-        tar -xz --strip-components=1 -C /var/opt/geoip --wildcards "*.mmdb" -f "$TMPFILE" && \
-        echo "GeoLite2-City downloaded successfully." && \
-        rm -f "$TMPFILE" || \
-        { echo "WARNING: GeoLite2-City download failed. GeoIP will use fallback behavior."; rm -f "$TMPFILE"; true; }; \
-    else \
-        echo "MAXMIND_LICENSE_KEY not set. GeoIP will gracefully fallback."; \
-    fi
+RUN chmod +x /usr/local/bin/download_geoip.sh && \
+    /usr/local/bin/download_geoip.sh /var/opt/geoip
 
 # Fix permissions
-RUN chmod +x /usr/local/bin/entrypoint.sh && \
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/download_geoip.sh && \
     mkdir -p /app/geoip && \
     chown -R appuser:appgroup /app /var/opt/geoip
 
