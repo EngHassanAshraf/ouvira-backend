@@ -1,27 +1,10 @@
 [build]
-builder = "nixpacks"
-buildCommand = """
-pip install -r /app/requirements.txt &&
-mkdir -p /app/backend/geoip &&
-if [ -n "$MAXMIND_LICENSE_KEY" ]; then
-  TMPFILE=/tmp/geoip_$$.tar.gz &&
-  curl -Ls --fail "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" -o "$TMPFILE" &&
-  MAGIC=$(od -A n -t x1 -N 2 "$TMPFILE" 2>/dev/null | tr -d ' \n') &&
-  if [ "$MAGIC" = "1f8b" ]; then
-    tar -xz --strip-components=1 -C /app/backend/geoip --wildcards "*.mmdb" -f "$TMPFILE" &&
-    echo "GeoLite2-City downloaded successfully." ||
-    echo "WARNING: GeoIP extraction failed.";
-  else
-    echo "WARNING: Downloaded file is not gzip. Skipping.";
-  fi;
-  rm -f "$TMPFILE";
-else
-  echo "MAXMIND_LICENSE_KEY not set - skipping GeoIP download.";
-fi
-"""
+builder = "dockerfile"
+dockerfilePath = "docker/Dockerfile"
+buildArgs = { MAXMIND_LICENSE_KEY = "${{MAXMIND_LICENSE_KEY}}" }
 
-# cache bust: 8
+# cache bust: 9
 
 [deploy]
-startCommand = "cd /app/backend && python manage.py migrate_schemas --shared && gunicorn config.wsgi:application --config gunicorn.conf.py"
+startCommand = "cd /app && python manage.py migrate_schemas --shared && gunicorn config.wsgi:application --config gunicorn.conf.py"
 healthcheckPath = "/health/"
