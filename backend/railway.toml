@@ -1,7 +1,7 @@
 [build]
 builder = "nixpacks"
 buildCommand = """
-pip install -r ../requirements.txt &&
+pip install -r /app/requirements.txt &&
 mkdir -p /app/backend/geoip &&
 if [ -n "$MAXMIND_LICENSE_KEY" ]; then
   TMPFILE=/tmp/geoip_$$.tar.gz &&
@@ -12,7 +12,7 @@ if [ -n "$MAXMIND_LICENSE_KEY" ]; then
     echo "GeoLite2-City downloaded successfully." ||
     echo "WARNING: GeoIP extraction failed.";
   else
-    echo "WARNING: Downloaded file is not gzip (MaxMind returned an error). Skipping.";
+    echo "WARNING: Downloaded file is not gzip. Skipping.";
   fi;
   rm -f "$TMPFILE";
 else
@@ -20,7 +20,7 @@ else
 fi
 """
 
-# cache bust: 7
+# cache bust: 8
 
 [deploy]
 startCommand = "cd /app/backend && python manage.py migrate_schemas --shared && gunicorn config.wsgi:application --config gunicorn.conf.py"
