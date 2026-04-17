@@ -39,6 +39,8 @@ class Company(TimeStampedModel, SoftDeleteModel):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="created_companies",
+        null=True,
+        blank=True,
     )
 
     class Meta:
