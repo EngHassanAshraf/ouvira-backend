@@ -24,8 +24,15 @@ class NotificationListSerializer(serializers.ModelSerializer):
 
 
 class ActivityLogSerializer(serializers.ModelSerializer):
-    """Full activity log serializer."""
+    """Full activity log serializer — used for per-employee change history."""
     user_display = serializers.CharField(source="user.__str__", read_only=True)
+    changed_fields = serializers.SerializerMethodField()
+
+    def get_changed_fields(self, obj):
+        """Return list of field names that changed (keys of new_values)."""
+        if obj.new_values and isinstance(obj.new_values, dict):
+            return list(obj.new_values.keys())
+        return []
 
     class Meta:
         model = ActivityLog
@@ -34,10 +41,10 @@ class ActivityLogSerializer(serializers.ModelSerializer):
             "user",
             "user_display",
             "company",
-            "date",
             "entity_type",
             "entity_id",
             "action",
+            "changed_fields",
             "old_values",
             "new_values",
             "ip_address",

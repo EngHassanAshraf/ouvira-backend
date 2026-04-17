@@ -40,7 +40,7 @@ class ActivityLogService:
     @staticmethod
     def log_activity(
         user,
-        company,
+        company_id: int,
         date_dim,
         entity_type: str,
         entity_id: int,
@@ -49,14 +49,18 @@ class ActivityLogService:
         new_values: dict = None,
         ip_address: str = None,
     ) -> ActivityLog:
-        """Log an activity."""
-        # Sanitize values to ensure they are JSON serializable
+        """
+        Log an activity.
+
+        Accepts ``company_id`` (int) instead of a Company instance so that
+        callers inside signals don't need to fetch the full object.
+        """
         safe_old = ActivityLogService._sanitize_data(old_values)
         safe_new = ActivityLogService._sanitize_data(new_values)
 
         log = ActivityLog.objects.create(
             user=user,
-            company=company,
+            company_id=company_id,
             date=date_dim,
             entity_type=entity_type,
             entity_id=entity_id,
@@ -65,5 +69,7 @@ class ActivityLogService:
             new_values=safe_new,
             ip_address=ip_address,
         )
-        logger.info(f"Activity logged: {action} by {user} on {entity_type}:{entity_id}")
+        logger.info(
+            "Activity logged: %s by %s on %s:%s", action, user, entity_type, entity_id
+        )
         return log
