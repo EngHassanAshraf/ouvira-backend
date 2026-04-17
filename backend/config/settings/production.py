@@ -53,7 +53,9 @@ DATABASES = {
 }
 
 # Security hardening
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True") == "True"
+# Exempt health check from SSL redirect so Railway probe always gets 200
+SECURE_REDIRECT_EXEMPT = [r"^health/$"]
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
