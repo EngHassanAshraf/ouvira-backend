@@ -70,6 +70,9 @@ typing_extensions==4.15.0
 # --- Excel/CSV Import ---
 openpyxl==3.1.5
 
+# --- Filtering ---
+django-filter==25.2
+
 # --- Type Stubs (dev/CI only — safe to exclude in prod image) ---
 django-stubs==5.2.8
 django-stubs-ext==5.2.8
