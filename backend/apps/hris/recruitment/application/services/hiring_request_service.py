@@ -5,15 +5,20 @@ from django.contrib.auth import get_user_model
 from apps.audit.services.activity_log_service import ActivityLogService
 from apps.audit.utils import get_or_create_date_dim
 from ...models import HiringRequest, HiringRequestApproval
+from .recruitment_audit_service import RecruitmentAuditService
 from ...domain.events.dispatcher import dispatcher
 from ...domain.events.events import (
-    HiringRequestSubmitted, 
-    HiringRequestApproved, 
+    HiringRequestSubmitted,
+    HiringRequestApproved,
     HiringRequestRejected
 )
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+# Fields that are safe to update on a HiringRequest
+_EDITABLE_FIELDS = {"job_title", "department", "vacancies", "purpose"}
+
 
 class HiringRequestService:
     """
@@ -35,7 +40,6 @@ class HiringRequestService:
             status=HiringRequest.Status.DRAFT
         )
 
-        # Log Activity
         ActivityLogService.log_activity(
             user=user,
             company=company,
@@ -48,7 +52,7 @@ class HiringRequestService:
                 "department_id": hiring_request.department_id,
                 "vacancies": hiring_request.vacancies,
                 "purpose": hiring_request.purpose,
-                "status": hiring_request.status
+                "status": hiring_request.status,
             }
         )
 
@@ -56,24 +60,173 @@ class HiringRequestService:
 
     @staticmethod
     @transaction.atomic
+    def update_hiring_request(request_id: int, user, data: dict) -> HiringRequest:
+        """
+        Updates a Hiring Request.
+
+        Rules:
+        - Only DRAFT requests can be edited.
+        - Only whitelisted fields are accepted (job_title, department, vacancies, purpose).
+        - Logs old vs new values for audit trail.
+        """
+        hiring_request = HiringRequest.objects.select_for_update().get(id=request_id)
+
+        if hiring_request.status != HiringRequest.Status.DRAFT:
+            raise ValueError(
+                f"Cannot edit a hiring request in '{hiring_request.status}' status. "
+                "Only draft requests can be modified."
+            )
+
+        old_values = {
+            "job_title_id": hiring_request.job_title_id,
+            "department_id": hiring_request.department_id,
+            "vacancies": hiring_request.vacancies,
+            "purpose": hiring_request.purpose,
+        }
+
+        changed = False
+        for field, value in data.items():
+            if field not in _EDITABLE_FIELDS:
+                continue
+            if getattr(hiring_request, field) != value:
+                setattr(hiring_request, field, value)
+                changed = True
+
+        if changed:
+            hiring_request.save()
+            ActivityLogService.log_activity(
+                user=user,
+                company=hiring_request.company,
+                date_dim=get_or_create_date_dim(timezone.now().date()),
+                entity_type="HiringRequest",
+                entity_id=hiring_request.id,
+                action="UPDATED",
+                old_values=old_values,
+                new_values={
+                    "job_title_id": hiring_request.job_title_id,
+                    "department_id": hiring_request.department_id,
+                    "vacancies": hiring_request.vacancies,
+                    "purpose": hiring_request.purpose,
+                }
+            )
+
+        return hiring_request
+
+    @staticmethod
+    @transaction.atomic
+    def cancel_hiring_request(request_id: int, user, reason: str = "") -> HiringRequest:
+        """
+        Cancels a Hiring Request.
+
+        Rules:
+        - DRAFT and SUBMITTED requests can be cancelled.
+        - APPROVED and already REJECTED requests cannot be cancelled.
+        - Cancellation is a terminal state — it cannot be undone.
+        """
+        hiring_request = HiringRequest.objects.select_for_update().get(id=request_id)
+
+        cancellable = {HiringRequest.Status.DRAFT, HiringRequest.Status.SUBMITTED}
+        if hiring_request.status not in cancellable:
+            raise ValueError(
+                f"Cannot cancel a hiring request in '{hiring_request.status}' status. "
+                "Only draft or submitted requests can be cancelled."
+            )
+
+        old_status = hiring_request.status
+        hiring_request.status = HiringRequest.Status.CANCELLED
+        hiring_request.save()
+
+        # Mark any pending approvals as rejected
+        HiringRequestApproval.objects.filter(
+            hiring_request=hiring_request,
+            status=HiringRequestApproval.ApprovalStatus.PENDING
+        ).update(
+            status=HiringRequestApproval.ApprovalStatus.REJECTED,
+            note=reason or "Cancelled by requester.",
+            action_at=timezone.now(),
+        )
+
+        ActivityLogService.log_activity(
+            user=user,
+            company=hiring_request.company,
+            date_dim=get_or_create_date_dim(timezone.now().date()),
+            entity_type="HiringRequest",
+            entity_id=hiring_request.id,
+            action="CANCELLED",
+            old_values={"status": old_status},
+            new_values={"status": hiring_request.status, "reason": reason}
+        )
+
+        RecruitmentAuditService.log(
+            user=user,
+            company=hiring_request.company,
+            entity_type="hiring_request",
+            entity_id=hiring_request.pk,
+            action="cancelled",
+            entity_label=str(hiring_request.job_title),
+            details={"reason": reason},
+        )
+
+        return hiring_request
+
+    @staticmethod
+    @transaction.atomic
+    def soft_delete_hiring_request(request_id: int, user) -> None:
+        """
+        Soft-deletes a Hiring Request.
+
+        Rules:
+        - Only DRAFT requests can be deleted.
+        - Submitted/approved requests must be cancelled first.
+        """
+        hiring_request = HiringRequest.objects.select_for_update().get(id=request_id)
+
+        if hiring_request.status != HiringRequest.Status.DRAFT:
+            raise ValueError(
+                f"Cannot delete a hiring request in '{hiring_request.status}' status. "
+                "Cancel it first, or only draft requests can be deleted."
+            )
+
+        hiring_request.is_deleted = True
+        hiring_request.deleted_at = timezone.now()
+        hiring_request.save(update_fields=["is_deleted", "deleted_at"])
+
+        ActivityLogService.log_activity(
+            user=user,
+            company=hiring_request.company,
+            date_dim=get_or_create_date_dim(timezone.now().date()),
+            entity_type="HiringRequest",
+            entity_id=hiring_request.id,
+            action="DELETED"
+        )
+
+        RecruitmentAuditService.log(
+            user=user,
+            company=hiring_request.company,
+            entity_type="hiring_request",
+            entity_id=hiring_request.pk,
+            action="deleted",
+            entity_label=str(hiring_request.job_title),
+        )
+
+    @staticmethod
+    @transaction.atomic
     def submit_hiring_request(request_id, user):
         """Submits a hiring request for approval."""
         hiring_request = HiringRequest.objects.select_for_update().get(id=request_id)
-        
+
         if hiring_request.status != HiringRequest.Status.DRAFT:
             raise ValueError("Only draft requests can be submitted.")
 
         hiring_request.status = HiringRequest.Status.SUBMITTED
         hiring_request.save()
 
-        # Initialize Approval Flow (As seen in UI screenshots: Employee -> HR -> Manager)
-        # For now, we seed the approval steps. Actual assignment logic can be added later.
         approval_steps = [
             HiringRequestApproval.ApproverRole.EMPLOYEE,
             HiringRequestApproval.ApproverRole.HR,
             HiringRequestApproval.ApproverRole.MANAGER
         ]
-        
+
         for role in approval_steps:
             HiringRequestApproval.objects.create(
                 hiring_request=hiring_request,
@@ -81,7 +234,6 @@ class HiringRequestService:
                 status=HiringRequestApproval.ApprovalStatus.PENDING
             )
 
-        # Log Activity
         ActivityLogService.log_activity(
             user=user,
             company=hiring_request.company,
@@ -91,7 +243,15 @@ class HiringRequestService:
             action="SUBMITTED"
         )
 
-        # Dispatch Domain Event
+        RecruitmentAuditService.log(
+            user=user,
+            company=hiring_request.company,
+            entity_type="hiring_request",
+            entity_id=hiring_request.pk,
+            action="submitted",
+            entity_label=str(hiring_request.job_title),
+        )
+
         dispatcher.dispatch(HiringRequestSubmitted(
             request_id=hiring_request.id,
             company_id=hiring_request.company.id,
@@ -117,7 +277,6 @@ class HiringRequestService:
         approval.action_at = timezone.now()
         approval.save()
 
-        # Log Activity
         ActivityLogService.log_activity(
             user=user,
             company=hiring_request.company,
@@ -127,15 +286,23 @@ class HiringRequestService:
             action=f"APPROVED_{role_type.upper()}"
         )
 
-        # Check if all steps are approved
+        RecruitmentAuditService.log(
+            user=user,
+            company=hiring_request.company,
+            entity_type="hiring_request",
+            entity_id=hiring_request.pk,
+            action="approved",
+            entity_label=str(hiring_request.job_title),
+            details={"role_type": role_type},
+        )
+
         if not HiringRequestApproval.objects.filter(
             hiring_request=hiring_request,
             status=HiringRequestApproval.ApprovalStatus.PENDING
         ).exists():
             hiring_request.status = HiringRequest.Status.APPROVED
             hiring_request.save()
-            
-            # Dispatch Final Approval Event
+
             dispatcher.dispatch(HiringRequestApproved(
                 request_id=hiring_request.id,
                 company_id=hiring_request.company.id,
@@ -149,8 +316,7 @@ class HiringRequestService:
     def reject_request(request_id, user, role_type, reason):
         """Rejects the hiring request at any step."""
         hiring_request = HiringRequest.objects.select_for_update().get(id=request_id)
-        
-        # Reject specific step
+
         approval = HiringRequestApproval.objects.get(
             hiring_request=hiring_request,
             role_type=role_type,
@@ -162,11 +328,9 @@ class HiringRequestService:
         approval.action_at = timezone.now()
         approval.save()
 
-        # Update Request Status
         hiring_request.status = HiringRequest.Status.REJECTED
         hiring_request.save()
 
-        # Log Activity
         ActivityLogService.log_activity(
             user=user,
             company=hiring_request.company,
@@ -177,7 +341,16 @@ class HiringRequestService:
             new_values={"reason": reason}
         )
 
-        # Dispatch Event
+        RecruitmentAuditService.log(
+            user=user,
+            company=hiring_request.company,
+            entity_type="hiring_request",
+            entity_id=hiring_request.pk,
+            action="rejected",
+            entity_label=str(hiring_request.job_title),
+            details={"role_type": role_type, "reason": reason},
+        )
+
         dispatcher.dispatch(HiringRequestRejected(
             request_id=hiring_request.id,
             company_id=hiring_request.company.id,

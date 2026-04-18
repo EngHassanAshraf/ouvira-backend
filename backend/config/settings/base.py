@@ -11,7 +11,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # === CORE SETTINGS ===
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent  # /app
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 
@@ -41,6 +41,7 @@ SHARED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
     "drf_yasg",
     "apps.company",
     "apps.audit",
@@ -60,6 +61,7 @@ TENANT_CREATED_APPS = (
     'apps.hris.performance',
     'apps.hris.termination',
     'apps.hris.analytics',
+    'apps.hris.internal_auth',
 )
 
 TENANT_THIRD_PARTY = ()
@@ -94,6 +96,11 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
@@ -118,6 +125,8 @@ REST_FRAMEWORK = {
         "otp_send": "1/m",
         "forgot_password": "3/h",
         "password_change": "10/h",
+        # Internal auth
+        "internal_login": "10/m",
     },
 }
 
@@ -150,6 +159,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Stores the current request in thread-local so signals can read
+    # the acting user and IP when writing audit log entries.
+    "apps.hris.hris_core.middleware.AuditMiddleware",
 ]
 
 
@@ -214,6 +226,38 @@ TIME_ZONE = "Africa/Cairo"
 USE_I18N = True
 
 USE_TZ = True
+
+
+# === HRIS SETTINGS ===
+
+# Employee ID prefix — enforced by EmployeeCreateSerializer.
+# Change to any string (e.g. "EMP-") to match your company convention.
+EMPLOYEE_ID_PREFIX = os.getenv("EMPLOYEE_ID_PREFIX", "s")
+
+# ── File Storage ───────────────────────────────────────────────────────────────
+# Controls where employee photos and documents are stored.
+# Set HRIS_STORAGE_BACKEND=s3 in .env to use S3; defaults to local filesystem.
+
+HRIS_STORAGE_BACKEND = os.getenv("HRIS_STORAGE_BACKEND", "local")  # "local" | "s3"
+
+if HRIS_STORAGE_BACKEND == "s3":
+    # Requires django-storages + boto3 in requirements.txt
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "ouvira-hris")
+    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_DEFAULT_ACL = "private"
+    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN", "")
+    # Separate location prefixes for photos vs documents
+    AWS_LOCATION = os.getenv("AWS_S3_LOCATION", "hris")
+else:
+    # Local filesystem — files stored under MEDIA_ROOT
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+
+MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 
 # === STATIC ===
@@ -295,8 +339,11 @@ TURNSTILE_BYPASS_TOKEN = os.getenv("TURNSTILE_BYPASS_TOKEN", "")
 
 
 # === CELERY (JSON serializer prevents pickle deserialization attacks) ===
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+REDIS_CACHE_URL = os.getenv("REDIS_CACHE_URL", REDIS_URL)
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -324,3 +371,29 @@ CELERY_BEAT_SCHEDULE = {
 
 # === GEOIP (MaxMind GeoLite2 offline DB path) ===
 GEOIP_PATH = os.path.join(BASE_DIR, "geoip", "GeoLite2-City.mmdb")
+
+
+# === CACHE ===
+# Redis is required for correct throttling and OTP lockout behavior in
+# multi-worker deployments. The default LocMemCache is per-process and
+# does NOT share state across Gunicorn workers or Celery workers.
+#
+# DRF throttling uses django.core.cache.cache — if this is LocMemCache,
+# each worker has its own counter and rate limits are effectively multiplied
+# by the number of workers (e.g. 4 workers × 5/min = 20 effective req/min).
+#
+# OTP attempt locking (Redis-based in OTPService) is already correct, but
+# DRF's ScopedRateThrottle for otp_verify is a secondary backstop that also
+# needs Redis to be consistent.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_CACHE_URL,
+        "KEY_PREFIX": "ouvira",
+        "TIMEOUT": 300,  # 5 minutes default TTL
+    }
+}
+
+# Session engine — use cache-backed sessions for multi-worker consistency
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"

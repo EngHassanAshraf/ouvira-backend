@@ -1,0 +1,11 @@
+scenario,first_name,last_name,email,phone,source,expected_status
+happy_path_en,Ahmed,Al-Rashidi,ahmed.csv.001@example.com,+966501234567,LinkedIn,201
+happy_path_arabic,فاطمة,الزهراء,fatima.csv.002@example.com,+966509876543,إعلان داخلي,201
+happy_path_mixed,Sara,Al-Qahtani,sara.csv.003@example.com,+201012345678,Referral,201
+invalid_email,Bad,Email,not-an-email,+966501111111,Direct,400
+missing_email,No,Email,,+966502222222,Direct,400
+xss_first_name,<script>alert('xss')</script>,XSSTest,xss.csv.004@example.com,,Hack,201
+sql_injection,SQL,Injection,sql.csv.005@example.com,,'; DROP TABLE candidates; --,201
+boundary_max,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,B,boundary.csv.006@example.com,,Boundary,201
+unicode_name,محمد,O'Brien-Müller,unicode.csv.007@example.com,,Direct,201
+empty_payload,,,empty.csv.008@example.com,,,400

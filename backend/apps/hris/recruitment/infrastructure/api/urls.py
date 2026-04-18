@@ -10,6 +10,8 @@ from .views import (
     CandidateDocumentViewSet,
     JobOfferViewSet,
     OnboardingViewSet,
+    RecruitmentAuditLogViewSet,
+    PostProbationEvaluationViewSet,
 )
 
 app_name = "recruitment"
@@ -23,7 +25,13 @@ router.register(r"interviews", InterviewViewSet, basename="interview")
 router.register(r"documents", CandidateDocumentViewSet, basename="document")
 router.register(r"offers", JobOfferViewSet, basename="offer")
 router.register(r"onboarding", OnboardingViewSet, basename="onboarding")
+router.register(r"post-probation", PostProbationEvaluationViewSet, basename="post-probation")
 
 urlpatterns = [
     path("", include(router.urls)),
+    path(
+        "audit-log/<str:entity_type>/",
+        RecruitmentAuditLogViewSet.as_view({"get": "list"}),
+        name="recruitment-audit-log",
+    ),
 ]

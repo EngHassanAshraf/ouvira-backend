@@ -44,24 +44,41 @@ class InterviewService:
 
     @staticmethod
     @transaction.atomic
-    def record_interview_result(interview_id, user, scoring_data, note=None):
+    def record_interview_result(interview_id, user, scoring_data, note=None, call_status=None):
         """
         Records the scoring and feedback for a completed interview.
-        Calculates the average score based on the metrics provided.
+
+        scoring_data can be:
+        - List format (new): [{"interviewer_id": 1, "score": 8.0, "note": "..."}]
+        - Dict format (legacy): {"tasks": 8, "ethics": 9}
+
+        average_score is auto-computed from the scores.
         """
         interview = Interview.objects.select_for_update().get(id=interview_id)
-        
-        # Calculate Average Score from scoring_data (e.g. {"tasks": 8, "ethics": 9})
-        scores = [v for k, v in scoring_data.items() if isinstance(v, (int, float))]
-        avg_score = sum(scores) / len(scores) if scores else 0.0
-        
+
+        # Compute average score
+        if isinstance(scoring_data, list):
+            # New structured format: list of {interviewer_id, score, note}
+            scores = [
+                entry["score"] for entry in scoring_data
+                if isinstance(entry, dict) and "score" in entry
+            ]
+        else:
+            # Legacy dict format: {metric_name: score_value}
+            scores = [v for v in scoring_data.values() if isinstance(v, (int, float))]
+
+        avg_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+
         interview.scoring_data = scoring_data
-        interview.average_score = round(avg_score, 2)
+        interview.average_score = avg_score
         interview.note = note
         interview.status = Interview.Status.COMPLETED
+
+        if call_status is not None:
+            interview.call_status = call_status
+
         interview.save()
 
-        # Log Activity
         ActivityLogService.log_activity(
             user=user,
             company=interview.application.job_advertisement.hiring_request.company,
@@ -69,7 +86,7 @@ class InterviewService:
             entity_type="Interview",
             entity_id=interview.id,
             action="COMPLETED",
-            new_values={"scoring_data": scoring_data, "avg_score": avg_score}
+            new_values={"avg_score": avg_score, "call_status": call_status}
         )
 
         return interview

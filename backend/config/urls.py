@@ -19,6 +19,8 @@ Structure:
 import datetime
 
 from django.contrib import admin
+from django.conf import settings
+from django.conf.urls.static import static
 from django.http import JsonResponse
 from django.urls import include, path, re_path
 from drf_yasg import openapi
@@ -129,4 +131,4 @@ urlpatterns = [
         schema_view.with_ui("redoc", cache_timeout=0),
         name="schema-redoc",
     ),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

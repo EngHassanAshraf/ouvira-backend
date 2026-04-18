@@ -16,6 +16,9 @@ if SECRET_KEY and "django-insecure" in SECRET_KEY:
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
+# Railway healthcheck uses a fixed host — always allow it
+ALLOWED_HOSTS += ["healthcheck.railway.app", ".railway.app"]
+
 # CORS — whitelist only trusted origins
 CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "False") == "True"
 CORS_ALLOWED_ORIGINS = [
@@ -45,11 +48,14 @@ DATABASES = {
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT"),
+        "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "60")),
     }
 }
 
 # Security hardening
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True") == "True"
+# Exempt health check from SSL redirect so Railway probe always gets 200
+SECURE_REDIRECT_EXEMPT = [r"^health/$"]
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 

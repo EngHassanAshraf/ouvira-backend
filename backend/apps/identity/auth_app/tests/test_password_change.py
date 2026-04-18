@@ -15,13 +15,16 @@ class PasswordChangeTests(BaseAuthTestCase):
 
     def setUp(self):
         super().setUp()
-        self.change_url = reverse("password-change")
+        self.change_url = reverse("v1:auth:password-change")
         
         self.user = CustomUser.objects.create_user(
             username="changeuser",
             email="change@ouvira.app",
             password="OldPassword123!"
         )
+        self.user.is_active = True
+        self.user.email_verified = True
+        self.user.save(update_fields=["is_active", "email_verified"])
         refresh = RefreshToken.for_user(self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
         cache.clear()

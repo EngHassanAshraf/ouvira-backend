@@ -97,6 +97,7 @@ backend/apps/
 │
 ├── hris/
 │   ├── hris_core/         # Employee, Department, Position, Location, Organization
+│   ├── internal_auth/     # Internal company login, enriched JWT, permission resolver
 │   ├── leave_management/  # Leave requests and approvals
 │   ├── recruitment/       # Hiring requests, candidates, job applications, interviews
 │   ├── travel_management/ # Travel requests and approvals
@@ -125,7 +126,8 @@ All endpoints are versioned under `/api/v1/`:
 
 | Domain | Base Path |
 |--------|-----------|
-| Authentication & 2FA | `/api/v1/auth/` |
+| Authentication & 2FA (external) | `/api/v1/auth/` |
+| Internal company authentication | `/api/v1/hris/internal/auth/` |
 | User account & profile | `/api/v1/account/` |
 | Roles, permissions, invitations | `/api/v1/access-control/` |
 | Company management | `/api/v1/company/` |
@@ -153,6 +155,16 @@ See [api_documentation.md](api_documentation.md) for full endpoint reference.
 - Session management and token blacklisting
 - Cloudflare Turnstile integration
 
+### Internal Company Authentication
+- Separate login flow for employees and staff (`POST /api/v1/hris/internal/auth/login/`)
+- Enriched JWT payload: `company_id`, `employee_id`, `roles`, `permissions`, `modules`
+- Role-based redirect: maps highest-priority role to default frontend module + path
+- Covers all ERP modules: admin, hr, payroll, finance, inventory, procurement, sales, projects, IT, legal, marketing, operations, self-service
+- Account lockout: 5 failed attempts → 30-min lock
+- Full audit trail: every attempt (success/failure/locked) logged to `InternalLoginAttempt`
+- Redis-cached permission resolution (5-min TTL, per user+company)
+- Zero DB queries on `/me/` endpoint — reads JWT claims directly
+
 ### Multi-Tenancy
 - Schema-based tenant isolation
 - Automatic tenant routing via X-Tenant header
@@ -178,11 +190,44 @@ See [api_documentation.md](api_documentation.md) for full endpoint reference.
 - **Attendance Tracking**: Clock-in/clock-out records
 
 ### Recruitment
-- **Hiring Requests**: Manager approval workflow
+- **Hiring Requests**: Manager approval workflow (employee → HR → direct manager)
+  - Edit: draft only (job_title, department, vacancies, purpose)
+  - Cancel: draft or submitted (terminal)
+  - Soft delete: draft only
+  - Approval flow timeline: GET endpoint returning full chain with timestamps
+  - Bulk actions: bulk approve, bulk reject, bulk delete (up to 100 IDs per call)
+  - Multi-field filtering: `?department=`, `?status=`, `?job_title=`, `?created_by=`
+- **Job Advertisements**: Full lifecycle management
+  - Edit: draft (all fields) | published (deadline + platforms only) | closed (blocked)
+  - Reopen: closed → draft for revision
+  - Soft delete: draft only
+  - Bulk actions: bulk publish, bulk close
+  - Multi-field filtering: `?status=`, `?city=`, `?area=`, `?platforms=`, `?deadline_before=`, `?deadline_after=`
 - **Candidate Management**: Candidate profiles and tracking
-- **Job Applications**: Application processing
-- **Interviews**: Interview scheduling and feedback
-- **Job Offers**: Offer generation and onboarding
+- **Job Applications**: Kanban pipeline (applied → phone_screening → interview → offer → hired/rejected)
+  - CV import from Excel/CSV with per-row error summary (5 MB / 1000 rows max)
+  - Job board sync placeholder (LinkedIn, Bayt)
+  - Bulk edit: update classification on multiple applications at once
+  - Multi-field filtering: `?status=`, `?classification=`, `?job_board=`, `?job_advertisement=`, `?candidate=`
+  - New `job_board` field: linkedin, facebook, bayt, recommendation, internal, other
+- **Interviews**: Interview scheduling and per-interviewer scoring
+  - `record-result` accepts list scoring: `[{"interviewer_id": 1, "score": 8.5, "note": "..."}]`
+  - `average_score` auto-computed from per-interviewer scores
+  - New `call_status` field: not_answered, suitable, call_back
+- **Job Offers**: Offer generation, accept (creates Employee record), decline
+  - New `offer_validity_date` field with cross-field validation against `start_date`
+- **Candidate Documents**: Document upload and verification
+  - Added `birth_certificate` doc type
+- **Onboarding**: Task checklist management with structured session fields
+  - New fields: session_date, session_location, assigned_mentor, attended, engagement_level, survey_link, survey_responses
+- **Post-Probation Evaluation**: Multi-step approval workflow
+  - Workflow: draft → submitted_to_manager → manager_approved → hr_confirmed → final_decision
+  - Score fields (1–5): tasks, attendance, initiative, collaboration, teamwork
+  - `average_score` auto-computed on save
+  - Actions: submit-to-manager, manager-approve, hr-confirm, record-decision (confirmed/terminated)
+- **Scoped Audit Trail**: Per-entity audit log endpoints
+  - `GET /audit-log/hiring-requests/`, `/audit-log/job-advertisements/`, `/audit-log/applications/`
+  - Filterable by action_type, performed_by, date range, and search
 
 ### Audit & Compliance
 - Activity logging for all operations

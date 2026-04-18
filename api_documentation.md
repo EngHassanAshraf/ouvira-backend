@@ -12,13 +12,14 @@
 2. [Authentication](#authentication)
 3. [Error Handling](#error-handling)
 4. [Endpoints](#endpoints)
-   - [Auth](#1-auth--apiv1auth)
-   - [Account](#2-account--apiv1account)
-   - [Access Control](#3-access-control--apiv1access-control)
-   - [Company](#4-company--apiv1company)
-   - [HRIS Core](#5-hris-core--apiv1hriscore)
-   - [Recruitment](#6-recruitment--apiv1hrisrecruitment)
-   - [Audit](#7-audit--apiv1audit)
+   - [Auth (External)](#1-auth-external--apiv1auth)
+   - [Internal Auth](#2-internal-auth--apiv1hrisinternalauth)
+   - [Account](#3-account--apiv1account)
+   - [Access Control](#4-access-control--apiv1access-control)
+   - [Company](#5-company--apiv1company)
+   - [HRIS Core](#6-hris-core--apiv1hriscore)
+   - [Recruitment](#7-recruitment--apiv1hrisrecruitment)
+   - [Audit](#8-audit--apiv1audit)
 5. [Utility Endpoints](#utility-endpoints)
 6. [Pagination](#pagination)
 7. [Rate Limiting](#rate-limiting)
@@ -112,7 +113,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## Endpoints
 
-### 1. Auth — `/api/v1/auth/`
+### 1. Auth (External) — `/api/v1/auth/`
 
 #### POST `/api/v1/auth/signup/`
 **Auth:** None | **Rate:** 3/hour
@@ -268,7 +269,178 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 2. Account — `/api/v1/account/`
+### 2. Internal Auth — `/api/v1/hris/internal/auth/`
+
+Internal authentication for company employees and staff. Separate from the external auth flow — no OTP, no Turnstile, no signup. Returns enriched JWT with company context, employee context, roles, permissions, and a role-based redirect.
+
+**Two auth flows exist:**
+
+| Flow | Endpoint prefix | Who uses it |
+|------|----------------|-------------|
+| External | `/api/v1/auth/` | Customers, tenant owners, SaaS signup |
+| Internal | `/api/v1/hris/internal/auth/` | Employees, HR staff, managers, admins |
+
+---
+
+#### POST `/api/v1/hris/internal/auth/login/`
+
+**Auth:** None | **Rate:** 10/min
+
+Authenticate an internal user. Returns enriched JWT with company context, employee ID, roles, permissions, and a redirect hint.
+
+**Request:**
+
+```json
+{
+  "identifier": "ahmed@company.com",
+  "password": "SecureP@ss123",
+  "company_id": 1
+}
+```
+
+`company_id` is optional. If omitted, the user's primary active company is used. Required only for users who belong to multiple companies.
+
+**Response (200):**
+
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "eyJ...",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "user": {
+    "id": 1,
+    "account_uid": "USR-1234ABCD",
+    "email": "ahmed@company.com",
+    "full_name": "Ahmed Mohamed",
+    "company_id": 1,
+    "employee_id": "EMP-001",
+    "roles": ["HR_ADMIN"],
+    "permissions": ["hr.view_employee", "hr.edit_employee", "hr.approve_leave"],
+    "modules": ["hr"]
+  },
+  "redirect": {
+    "module": "hr",
+    "path": "/hr/dashboard"
+  }
+}
+```
+
+**JWT access token payload includes:**
+
+| Claim | Type | Description |
+|-------|------|-------------|
+| `user_id` | int | User primary key |
+| `company_id` | int | Resolved company |
+| `employee_id` | string \| null | Employee ID string (e.g. `EMP-001`) |
+| `roles` | string[] | All active role names for this user+company |
+| `permissions` | string[] | Flattened, deduplicated permission codes |
+| `modules` | string[] | Accessible module names derived from permissions |
+| `token_type` | string | Always `"internal_access"` |
+
+**Error responses:**
+
+| Status | When |
+|--------|------|
+| 400 | Missing or invalid input fields |
+| 401 | Wrong credentials, inactive account, deleted account, no active company |
+| 429 | Rate limit exceeded (10/min) |
+| 500 | Unexpected server error |
+
+All auth failures return `401` with a generic message — specific failure reasons are never exposed to prevent user enumeration.
+
+**Account lockout:** 5 consecutive failed attempts → 30-minute lockout. Returns `401` with lockout message.
+
+---
+
+#### POST `/api/v1/hris/internal/auth/logout/`
+
+**Auth:** Bearer Token (internal access token)
+
+Blacklist the refresh token. Uses the same SimpleJWT blacklist as the external flow.
+
+**Request:**
+
+```json
+{ "refresh_token": "eyJ..." }
+```
+
+**Response (205):**
+
+```json
+{ "detail": "Logged out successfully." }
+```
+
+---
+
+#### GET `/api/v1/hris/internal/auth/me/`
+
+**Auth:** Bearer Token (internal access token)
+
+Returns the current user's context decoded directly from the JWT — zero database queries.
+
+**Response (200):**
+
+```json
+{
+  "user_id": 1,
+  "company_id": 1,
+  "employee_id": "EMP-001",
+  "roles": ["HR_ADMIN"],
+  "permissions": ["hr.view_employee", "hr.edit_employee"],
+  "modules": ["hr"],
+  "token_type": "internal_access"
+}
+```
+
+---
+
+#### Role → Module Redirect Map
+
+The `redirect` object in the login response maps the user's highest-priority role to a default frontend route. Priority order (highest first):
+
+| Role | Module | Default Path |
+|------|--------|-------------|
+| `super_admin` / `system_admin` / `admin` | `admin` | `/admin/dashboard` |
+| `finance_director` | `finance` | `/finance/dashboard` |
+| `hr_admin` / `hr_manager` | `hr` | `/hr/dashboard` |
+| `payroll_admin` / `payroll_manager` | `payroll` | `/payroll/overview` |
+| `sales_director` / `crm_admin` | `sales` | `/sales/dashboard` |
+| `procurement_manager` | `procurement` | `/procurement/dashboard` |
+| `inventory_manager` / `warehouse_manager` | `inventory` | `/inventory/dashboard` |
+| `pmo_director` | `projects` | `/projects/dashboard` |
+| `it_manager` / `it_admin` | `it` | `/it/dashboard` |
+| `legal_manager` | `legal` | `/legal/dashboard` |
+| `marketing_director` | `marketing` | `/marketing/dashboard` |
+| `operations_director` / `operations_manager` | `operations` | `/operations/dashboard` |
+| `hr_employee` / `hr_staff` | `hr` | `/hr/employees` |
+| `payroll_staff` | `payroll` | `/payroll/runs` |
+| `recruiter` / `recruitment_manager` | `recruitment` | `/recruitment/pipeline` |
+| `direct_manager` / `department_manager` / `manager` | `hr` | `/hr/team` |
+| `employee` (default) | `self` | `/self-service/dashboard` |
+
+The frontend may override the redirect — the `redirect` field is a hint, not a hard redirect.
+
+---
+
+#### Internal Login Audit
+
+Every login attempt (success, failure, lockout) is recorded in `InternalLoginAttempt`:
+
+| Field | Description |
+|-------|-------------|
+| `identifier` | Email or username submitted |
+| `outcome` | `success` \| `failure` \| `locked` |
+| `failure_reason` | Machine-readable reason (never exposed to client) |
+| `user` | Resolved user (null if not found) |
+| `company_id` | Resolved company (null if not resolved) |
+| `ip_address` | Client IP |
+| `user_agent` | HTTP User-Agent |
+| `created_at` | Timestamp |
+
+---
+
+### 3. Account — `/api/v1/account/`
 
 #### GET/PUT/PATCH `/api/v1/account/profile/`
 **Auth:** Bearer Token
@@ -300,7 +472,7 @@ Returns paginated list of active users.
 
 ---
 
-### 3. Access Control — `/api/v1/access-control/`
+### 4. Access Control — `/api/v1/access-control/`
 
 #### Permissions
 
@@ -392,7 +564,7 @@ Returns paginated list of active users.
 
 ---
 
-### 4. Company — `/api/v1/company/`
+### 5. Company — `/api/v1/company/`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -402,7 +574,7 @@ Returns paginated list of active users.
 
 ---
 
-### 5. HRIS Core — `/api/v1/hris/core/`
+### 6. HRIS Core — `/api/v1/hris/core/`
 
 #### Employees
 
@@ -484,7 +656,7 @@ Returns paginated list of active users.
 
 ---
 
-### 6. Recruitment — `/api/v1/hris/recruitment/`
+### 7. Recruitment — `/api/v1/hris/recruitment/`
 
 All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus custom actions.
 
@@ -493,9 +665,28 @@ All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET/POST | `/api/v1/hris/recruitment/hiring-requests/` | List / create |
-| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/hiring-requests/{id}/` | Detail / update / delete |
+| GET | `/api/v1/hris/recruitment/hiring-requests/{id}/` | Detail |
+| PUT/PATCH | `/api/v1/hris/recruitment/hiring-requests/{id}/` | Update — **draft only** |
+| DELETE | `/api/v1/hris/recruitment/hiring-requests/{id}/` | Soft delete — **draft only** |
 | POST | `/api/v1/hris/recruitment/hiring-requests/{id}/submit/` | Submit for approval |
-| POST | `/api/v1/hris/recruitment/hiring-requests/{id}/approve/` | Approve (with role_type) |
+| POST | `/api/v1/hris/recruitment/hiring-requests/{id}/approve/` | Approve one step (`role_type` required) |
+| POST | `/api/v1/hris/recruitment/hiring-requests/{id}/reject/` | Reject at any step (`role_type` + `reason` required) |
+| POST | `/api/v1/hris/recruitment/hiring-requests/{id}/cancel/` | Cancel draft or submitted request |
+
+**Edit rules:**
+- `PUT/PATCH` only allowed on `draft` requests. Editable fields: `job_title`, `department`, `vacancies`, `purpose`.
+- `DELETE` only allowed on `draft` requests (soft delete). Cancel first if submitted.
+- `cancel` allowed on `draft` or `submitted`. Terminal — cannot be undone.
+
+**Approve body:**
+```json
+{ "role_type": "employee|hr_employee|direct_manager", "note": "optional" }
+```
+
+**Cancel body:**
+```json
+{ "reason": "Budget freeze — position postponed" }
+```
 
 **Object:**
 ```json
@@ -507,9 +698,12 @@ All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus
   "vacancies": 2,
   "purpose": "Expansion of engineering team",
   "status": "draft",
-  "created_by": 1
+  "created_by": 1,
+  "approvals": []
 }
 ```
+
+**Status lifecycle:** `draft` → `submitted` → `approved` | `rejected`
 
 ---
 
@@ -518,9 +712,20 @@ All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET/POST | `/api/v1/hris/recruitment/job-advertisements/` | List / create |
-| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/job-advertisements/{id}/` | Detail / update / delete |
-| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/publish/` | Publish ad |
-| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/close/` | Close ad |
+| GET | `/api/v1/hris/recruitment/job-advertisements/{id}/` | Detail |
+| PUT/PATCH | `/api/v1/hris/recruitment/job-advertisements/{id}/` | Update (state-dependent rules) |
+| DELETE | `/api/v1/hris/recruitment/job-advertisements/{id}/` | Soft delete — **draft only** |
+| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/publish/` | Publish draft ad |
+| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/close/` | Close published ad |
+| POST | `/api/v1/hris/recruitment/job-advertisements/{id}/reopen/` | Reopen closed ad → draft |
+
+**Edit rules:**
+- `draft`: all content fields editable (`title`, `description`, `requirements`, `skills`, `responsibilities`, `city`, `area`, `deadline`, `platforms`).
+- `published`: only `deadline` and `platforms` editable.
+- `closed`: no edits allowed — reopen first.
+- `DELETE`: draft only. Close first if published.
+
+**Status lifecycle:** `draft` → `published` → `closed` → `draft` (via reopen)
 
 **Object:**
 ```json
@@ -534,7 +739,9 @@ All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus
   "responsibilities": "...",
   "deadline": "2026-06-30",
   "platforms": ["internal", "linkedin"],
-  "status": "draft"
+  "status": "draft",
+  "published_at": null,
+  "closed_at": null
 }
 ```
 
@@ -664,7 +871,399 @@ All recruitment endpoints use DRF `DefaultRouter` and support standard CRUD plus
 
 ---
 
-### 7. Audit — `/api/v1/audit/`
+---
+
+### 7.1 New Recruitment Endpoints (v1.1)
+
+All endpoints below are under `/api/v1/hris/recruitment/`.
+
+---
+
+#### Hiring Requests — New Actions
+
+**Updated list filters** (`GET /hiring-requests/`):
+
+| Query Param | Description |
+|-------------|-------------|
+| `?department=<id>` | Filter by department ID |
+| `?status=` | Filter by status (`draft`, `submitted`, `approved`, `rejected`) |
+| `?job_title=<id>` | Filter by job title ID |
+| `?created_by=<id>` | Filter by creator user ID |
+
+---
+
+##### GET `/api/v1/hris/recruitment/hiring-requests/{id}/approval-flow/`
+**Auth:** Bearer Token
+
+Returns the full approval chain timeline for a hiring request.
+
+**Response (200):**
+```json
+[
+  {
+    "id": 1,
+    "role_type": "employee",
+    "approver": 5,
+    "approver_name": "Ahmed Mohamed",
+    "status": "approved",
+    "action_at": "2026-05-01T10:00:00Z",
+    "note": "Looks good",
+    "created_at": "2026-04-30T09:00:00Z"
+  },
+  {
+    "id": 2,
+    "role_type": "hr_employee",
+    "approver": null,
+    "approver_name": null,
+    "status": "pending",
+    "action_at": null,
+    "note": null,
+    "created_at": "2026-04-30T09:00:00Z"
+  }
+]
+```
+
+---
+
+##### POST `/api/v1/hris/recruitment/hiring-requests/bulk-approve/`
+**Auth:** Bearer Token
+
+Bulk approve up to 100 hiring requests in one call.
+
+**Request:**
+```json
+{ "ids": [1, 2], "role_type": "hr_employee", "note": "Approved in batch" }
+```
+
+**Response (200):**
+```json
+{ "success": [1, 2], "failed": [{"id": 3, "error": "Not in SUBMITTED status"}] }
+```
+
+---
+
+##### POST `/api/v1/hris/recruitment/hiring-requests/bulk-reject/`
+**Auth:** Bearer Token
+
+**Request:**
+```json
+{ "ids": [3], "role_type": "hr_employee", "reason": "Budget freeze" }
+```
+
+**Response (200):** Same bulk response format — `success` and `failed` arrays.
+
+---
+
+##### POST `/api/v1/hris/recruitment/hiring-requests/bulk-delete/`
+**Auth:** Bearer Token
+
+Soft-deletes draft hiring requests in bulk.
+
+**Request:**
+```json
+{ "ids": [4, 5] }
+```
+
+**Response (200):** Same bulk response format.
+
+> **Bulk response format (all bulk endpoints):**
+> ```json
+> { "success": [1, 2], "failed": [{"id": 3, "error": "Not in DRAFT status"}] }
+> ```
+> Maximum 100 IDs per request.
+
+---
+
+#### Job Advertisements — New Actions
+
+**Updated list filters** (`GET /job-advertisements/`):
+
+| Query Param | Description |
+|-------------|-------------|
+| `?status=` | Filter by status (`draft`, `published`, `closed`) |
+| `?city=` | Filter by city |
+| `?area=` | Filter by area |
+| `?platforms=` | Filter by platform |
+| `?deadline_before=YYYY-MM-DD` | Ads with deadline before this date |
+| `?deadline_after=YYYY-MM-DD` | Ads with deadline after this date |
+
+---
+
+##### POST `/api/v1/hris/recruitment/job-advertisements/bulk-publish/`
+**Auth:** Bearer Token
+
+**Request:**
+```json
+{ "ids": [1, 2] }
+```
+
+**Response (200):** Bulk response format.
+
+---
+
+##### POST `/api/v1/hris/recruitment/job-advertisements/bulk-close/`
+**Auth:** Bearer Token
+
+**Request:**
+```json
+{ "ids": [3] }
+```
+
+**Response (200):** Bulk response format.
+
+---
+
+#### Job Applications — New Actions
+
+**Updated list filters** (`GET /applications/`):
+
+| Query Param | Description |
+|-------------|-------------|
+| `?status=` | Filter by pipeline status |
+| `?classification=` | Filter by classification (`shortlist_1`, `shortlist_2`, `none`) |
+| `?job_board=` | Filter by source (`linkedin`, `facebook`, `bayt`, `recommendation`, `internal`, `other`) |
+| `?job_advertisement=<id>` | Filter by job advertisement ID |
+| `?candidate=<id>` | Filter by candidate ID |
+
+---
+
+##### POST `/api/v1/hris/recruitment/applications/import-cvs/`
+**Auth:** Bearer Token | **Content-Type:** `multipart/form-data`
+
+Import candidates from an Excel (.xlsx) or CSV file.
+
+**Request (multipart form):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `file` | File | `.xlsx` or `.csv` (max 5 MB, 1000 rows) |
+| `job_advertisement_id` | Integer | Target job advertisement |
+
+**Response (200):**
+```json
+{
+  "added": 45,
+  "shortlist_1": 10,
+  "shortlist_2": 5,
+  "rejected": 3,
+  "errors": [
+    { "row": 12, "error": "Invalid email format" }
+  ],
+  "imported_at": "2026-05-01T10:00:00Z"
+}
+```
+
+---
+
+##### POST `/api/v1/hris/recruitment/applications/sync-from-job-boards/`
+**Auth:** Bearer Token
+
+Sync applications from external job boards (placeholder — returns mock data).
+
+**Request:**
+```json
+{ "job_advertisement_id": 1, "platforms": ["linkedin", "bayt"] }
+```
+
+**Response (200):**
+```json
+{
+  "synced": 12,
+  "skipped_duplicates": 3,
+  "platforms_attempted": ["linkedin", "bayt"],
+  "synced_at": "2026-05-01T10:00:00Z"
+}
+```
+
+---
+
+##### POST `/api/v1/hris/recruitment/applications/bulk-edit/`
+**Auth:** Bearer Token
+
+Bulk update the classification on multiple applications.
+
+**Request:**
+```json
+{ "ids": [1, 2, 3], "classification": "shortlist_1" }
+```
+
+**Response (200):** Bulk response format.
+
+---
+
+#### Audit Log — New Endpoints
+
+All audit log endpoints are read-only and scoped to a specific recruitment entity type.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/hris/recruitment/audit-log/hiring-requests/` | Audit trail for hiring requests |
+| GET | `/api/v1/hris/recruitment/audit-log/job-advertisements/` | Audit trail for job advertisements |
+| GET | `/api/v1/hris/recruitment/audit-log/applications/` | Audit trail for applications |
+
+**Query parameters (all three):**
+
+| Param | Description |
+|-------|-------------|
+| `?action_type=` | Filter by action name (e.g. `submitted`, `approved`) |
+| `?performed_by=<id>` | Filter by user ID |
+| `?from_date=YYYY-MM-DD` | Start of date range |
+| `?to_date=YYYY-MM-DD` | End of date range |
+| `?search=` | Search within action name |
+
+**Response (200) — paginated:**
+```json
+{
+  "count": 50,
+  "next": "...",
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "action": "submitted",
+      "entity_type": "hiring_request",
+      "entity_id": 5,
+      "performed_by_name": "Hassan Ashraf",
+      "performed_by_id": 3,
+      "timestamp": "2026-05-01T10:00:00Z",
+      "details": {}
+    }
+  ]
+}
+```
+
+---
+
+#### Post-Probation Evaluation — New Resource
+
+Full CRUD plus a multi-step approval workflow.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/v1/hris/recruitment/post-probation/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/recruitment/post-probation/{id}/` | Detail / update / delete |
+| POST | `/api/v1/hris/recruitment/post-probation/{id}/submit-to-manager/` | Submit draft to manager |
+| POST | `/api/v1/hris/recruitment/post-probation/{id}/manager-approve/` | Manager approves |
+| POST | `/api/v1/hris/recruitment/post-probation/{id}/hr-confirm/` | HR confirms |
+| POST | `/api/v1/hris/recruitment/post-probation/{id}/record-decision/` | Record final decision |
+
+**Workflow status lifecycle:**
+`draft` → `submitted_to_manager` → `manager_approved` → `hr_confirmed` → `final_decision`
+
+**Create body:**
+```json
+{
+  "application": 1,
+  "evaluation_date": "2026-07-01",
+  "tasks_score": 4,
+  "attendance_score": 5,
+  "initiative_score": 4,
+  "collaboration_score": 3,
+  "teamwork_score": 4
+}
+```
+
+All score fields accept values 1–5. `average_score` is auto-computed on save.
+
+**manager-approve body:**
+```json
+{ "note": "Good performance overall" }
+```
+
+**hr-confirm body:**
+```json
+{ "note": "Confirmed by HR" }
+```
+
+**record-decision body:**
+```json
+{ "decision": "confirmed", "rationale": "Excellent probation period" }
+```
+
+`decision` choices: `confirmed` | `terminated`
+
+**Object:**
+```json
+{
+  "id": 1,
+  "application": 1,
+  "evaluation_date": "2026-07-01",
+  "tasks_score": 4,
+  "attendance_score": 5,
+  "initiative_score": 4,
+  "collaboration_score": 3,
+  "teamwork_score": 4,
+  "average_score": 4.0,
+  "performance_score": 0,
+  "decision": "confirmed",
+  "comments": null,
+  "evaluated_by": 3,
+  "evaluated_by_name": "Hassan Ashraf",
+  "workflow_status": "draft",
+  "manager_note": "",
+  "hr_note": "",
+  "rationale": "",
+  "created_at": "2026-05-01T10:00:00Z",
+  "updated_at": "2026-05-01T10:00:00Z"
+}
+```
+
+---
+
+#### Updated Object Schemas (v1.1)
+
+##### JobApplication — new field
+
+| Field | Type | Choices |
+|-------|------|---------|
+| `job_board` | string (nullable) | `linkedin`, `facebook`, `bayt`, `recommendation`, `internal`, `other` |
+
+##### Interview — new field + updated `record-result`
+
+| Field | Type | Choices |
+|-------|------|---------|
+| `call_status` | string (nullable) | `not_answered`, `suitable`, `call_back` |
+
+`POST /interviews/{id}/record-result/` now accepts:
+```json
+{
+  "scoring_data": [
+    {"interviewer_id": 1, "score": 8.5, "note": "Strong communication"},
+    {"interviewer_id": 2, "score": 7.0, "note": "Good technical skills"}
+  ],
+  "note": "Overall strong candidate",
+  "call_status": "suitable"
+}
+```
+
+`scoring_data` can be a list of per-interviewer scores (each `score` is 0–10). `average_score` is auto-computed.
+
+##### JobOffer — new field
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `offer_validity_date` | date (nullable) | Offer expiry date — must be on or after `start_date` |
+
+##### CandidateDocument — updated `doc_type`
+
+Added `birth_certificate` to the `doc_type` choices:
+`id_copy`, `qualification`, `military_status`, `personal_photo`, `police_clearance`, **`birth_certificate`**, `other`
+
+##### Onboarding — new fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `session_date` | datetime (nullable) | Onboarding session date/time |
+| `session_location` | string | Location of the session |
+| `assigned_mentor` | FK (User, nullable) | Assigned mentor user |
+| `attended` | boolean (nullable) | Whether the candidate attended |
+| `engagement_level` | integer 1–5 (nullable) | Engagement rating |
+| `survey_link` | URL (nullable) | Link to onboarding survey |
+| `survey_responses` | JSON object | Structured survey responses |
+
+---
+
+### 8. Audit — `/api/v1/audit/`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -731,3 +1330,4 @@ GET /api/v1/hris/core/employees/?page=2&page_size=50
 | `forgot_password` | 3 | per hour |
 | `enable_2fa` | 10 | per hour |
 | `password_change` | 10 | per hour |
+| `internal_login` | 10 | per minute |

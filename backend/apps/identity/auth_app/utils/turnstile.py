@@ -5,6 +5,7 @@ from django.http import HttpRequest
 
 logger = logging.getLogger(__name__)
 
+
 def verify_turnstile(request: HttpRequest, token: str = None) -> bool:
     """
     Verify Cloudflare Turnstile token.
@@ -15,13 +16,20 @@ def verify_turnstile(request: HttpRequest, token: str = None) -> bool:
     """
     # 1. Environment-based bypass
     if getattr(settings, "DEBUG", False) or getattr(settings, "TEST_MODE", False):
-        logger.info("Bypassing Turnstile verification | DEBUG: %s | TEST_MODE: %s", getattr(settings, "DEBUG", False), getattr(settings, "TEST_MODE", False))
+        logger.info(
+            "Bypassing Turnstile verification | DEBUG: %s | TEST_MODE: %s",
+            getattr(settings, "DEBUG", False),
+            getattr(settings, "TEST_MODE", False),
+        )
         return True
-    
+
     # 2. Header-based bypass (for Postman/Automated testing)
     bypass_token = getattr(settings, "TURNSTILE_BYPASS_TOKEN", None)
     if bypass_token and request.headers.get("X-Turnstile-Bypass") == bypass_token:
-        logger.info("Bypassing Turnstile verification | bypass_token: <REDACTED> | request.headers.get(\"X-Turnstile-Bypass\"): %s", request.headers.get("X-Turnstile-Bypass"))
+        logger.info(
+            'Bypassing Turnstile verification | bypass_token: <REDACTED> | request.headers.get("X-Turnstile-Bypass"): %s',
+            request.headers.get("X-Turnstile-Bypass"),
+        )
         return True
 
     # 3. Request-based bypass (for Postman/Automated testing)
@@ -31,13 +39,13 @@ def verify_turnstile(request: HttpRequest, token: str = None) -> bool:
 
     # 4. Extract token if not provided
     if not token and request:
-        logger.info("Extracting token from request | request.data: %s", request.data)
+        logger.info("Extracting token from request")
         token = request.data.get("cf_turnstile_response")
 
     if not token:
         logger.info("No token provided | token: %s", token)
         return False
-    
+
     url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
     data = {
         "secret": settings.TURNSTILE_SECRET_KEY,
@@ -46,6 +54,7 @@ def verify_turnstile(request: HttpRequest, token: str = None) -> bool:
 
     # Optional: pass remote IP for validation
     from ipware import get_client_ip
+
     client_ip, _ = get_client_ip(request)
     if client_ip:
         logger.info("Turnstile verification data: %s", data)

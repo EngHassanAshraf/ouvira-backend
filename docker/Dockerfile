@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /wheels
 COPY ./requirements.txt .
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /wheels -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip wheel && \
+    pip wheel --no-cache-dir --no-deps --wheel-dir /wheels -r requirements.txt
 
 # --------- STAGE 2: Runner ---------
 FROM python:3.10-slim AS runner
@@ -31,25 +32,18 @@ RUN pip install --no-cache /wheels/*.whl
 # Copy backend application source
 COPY ./backend .
 
-# Copy entrypoint
+# Copy entrypoint and GeoIP helper
 COPY ./docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY ./docker/download_geoip.sh /usr/local/bin/download_geoip.sh
 
 # Download GeoLite2-City at build time into an immutable layer immune to volume mounts
 # This step is optional - the application will gracefully handle missing GeoIP database
 ARG MAXMIND_LICENSE_KEY
-RUN mkdir -p /var/opt/geoip && \
-    if [ -n "$MAXMIND_LICENSE_KEY" ]; then \
-    echo "Downloading GeoLite2-City..." && \
-    (curl -Ls --fail "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${MAXMIND_LICENSE_KEY}&suffix=tar.gz" \
-    | tar -xz --strip-components=1 -C /var/opt/geoip --wildcards "*.mmdb") \
-    && echo "GeoLite2-City downloaded successfully." \
-    || echo "WARNING: GeoLite2-City download failed. GeoIP will use fallback behavior. Check MAXMIND_LICENSE_KEY."; \
-    else \
-    echo "MAXMIND_LICENSE_KEY not set. GeoIP will gracefully fallback."; \
-    fi
+RUN chmod +x /usr/local/bin/download_geoip.sh && \
+    /usr/local/bin/download_geoip.sh /var/opt/geoip
 
 # Fix permissions
-RUN chmod +x /usr/local/bin/entrypoint.sh && \
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/download_geoip.sh && \
     mkdir -p /app/geoip && \
     chown -R appuser:appgroup /app /var/opt/geoip
 

@@ -36,9 +36,13 @@ class CompanyListCreateView(ListCreateAPIView):
         return CompanyDetailSerializer
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import Company
+            return Company.objects.none()
         return CompanyService.get_companies_for_user(self.request.user)
 
     def perform_create(self, serializer):
+        company = serializer.save()
         company = serializer.save()
         # Auto-create default settings for new company
         CompanySettingsService.get_or_create_settings(company)
@@ -62,6 +66,9 @@ class CompanyDetailView(RetrieveUpdateDestroyAPIView):
         return super().get_permissions()
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            from ..models import Company
+            return Company.objects.none()
         return CompanyService.get_companies_for_user(self.request.user)
 
     def perform_destroy(self, instance):
@@ -76,6 +83,7 @@ class CompanySettingsView(RetrieveUpdateAPIView):
     """
     serializer_class = CompanySettingsSerializer
     permission_classes = [IsAuthenticated]
+    queryset = CompanySettings.objects.all()  # satisfies drf-yasg; get_object overrides
 
     def get_permissions(self):
         if self.request.method in ("PUT", "PATCH"):
@@ -83,6 +91,8 @@ class CompanySettingsView(RetrieveUpdateAPIView):
         return super().get_permissions()
 
     def get_object(self):
+        if getattr(self, "swagger_fake_view", False):
+            return CompanySettings()
         company_pk = self.kwargs["pk"]
         # Verify user has access to this company
         company = CompanyService.get_company(company_pk, user=self.request.user)

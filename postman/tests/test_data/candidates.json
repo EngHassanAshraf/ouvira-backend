@@ -1,0 +1,102 @@
+[
+  {
+    "scenario": "happy_path_en",
+    "first_name": "Ahmed",
+    "last_name": "Al-Rashidi",
+    "email": "ahmed.alrashidi.001@example.com",
+    "phone": "+966501234567",
+    "linkedin_url": "https://linkedin.com/in/ahmed-alrashidi",
+    "source": "LinkedIn",
+    "expected_status": 201
+  },
+  {
+    "scenario": "happy_path_arabic",
+    "first_name": "فاطمة",
+    "last_name": "الزهراء",
+    "email": "fatima.zahraa.002@example.com",
+    "phone": "+966509876543",
+    "linkedin_url": "",
+    "source": "إعلان داخلي",
+    "expected_status": 201
+  },
+  {
+    "scenario": "happy_path_mixed",
+    "first_name": "Sara",
+    "last_name": "Al-Qahtani",
+    "email": "sara.alqahtani.003@example.com",
+    "phone": "+201012345678",
+    "linkedin_url": "https://linkedin.com/in/sara-alqahtani",
+    "source": "Referral — إحالة",
+    "expected_status": 201
+  },
+  {
+    "scenario": "invalid_email_format",
+    "first_name": "Bad",
+    "last_name": "Email",
+    "email": "not-an-email",
+    "phone": "+966501111111",
+    "linkedin_url": "",
+    "source": "Direct",
+    "expected_status": 400
+  },
+  {
+    "scenario": "missing_email",
+    "first_name": "No",
+    "last_name": "Email",
+    "email": "",
+    "phone": "+966502222222",
+    "linkedin_url": "",
+    "source": "Direct",
+    "expected_status": 400
+  },
+  {
+    "scenario": "xss_in_first_name",
+    "first_name": "<script>alert('xss')</script>",
+    "last_name": "XSSTest",
+    "email": "xss.candidate.004@example.com",
+    "phone": "",
+    "linkedin_url": "",
+    "source": "Hack",
+    "expected_status": 201
+  },
+  {
+    "scenario": "sql_injection_in_source",
+    "first_name": "SQL",
+    "last_name": "Injection",
+    "email": "sql.injection.005@example.com",
+    "phone": "",
+    "linkedin_url": "",
+    "source": "'; DROP TABLE hris_recruitment_candidates; --",
+    "expected_status": 201
+  },
+  {
+    "scenario": "boundary_max_name_100_chars",
+    "first_name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "last_name": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    "email": "boundary.max.006@example.com",
+    "phone": "",
+    "linkedin_url": "",
+    "source": "Boundary",
+    "expected_status": 201
+  },
+  {
+    "scenario": "boundary_over_max_name_101_chars",
+    "first_name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "last_name": "Test",
+    "email": "boundary.over.007@example.com",
+    "phone": "",
+    "linkedin_url": "",
+    "source": "Boundary",
+    "expected_status": 400
+  },
+  {
+    "scenario": "unicode_emoji_in_source",
+    "first_name": "Emoji",
+    "last_name": "Test",
+    "email": "emoji.test.008@example.com",
+    "phone": "",
+    "linkedin_url": "",
+    "source": "LinkedIn 🔗 — وظيفة",
+    "expected_status": 201
+  }
+]
