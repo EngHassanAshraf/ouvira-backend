@@ -1,16 +1,48 @@
+# === Python ===
 *.pyc
-db.sqlite3
-.env
+*.pyo
+*.pyd
 __pycache__/
-venv/
-staticfiles/
-entrprise_service/
+*.egg-info/
+dist/
+build/
 
+# === Django ===
+db.sqlite3
+staticfiles/
+media/
+*.log
+
+# === Environment ===
+.env
+.env.*
+!.env.example
+
+# === Virtual Environments ===
+venv/
+.venv/
+env/
+
+# === IDE ===
 .vscode/
 .idea/
-# Docker
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Docker ===
 backend/tmp_test_timezone.py
-geoip
+
+# === GeoIP DB (binary, downloaded at build time) ===
+geoip/
+
+# === Railway local env ===
 railway_services_env/
+
+# === Misc tracked by mistake ===
+entrprise_service/
 tatus
-.kiro
+
+# === Kiro ===
+.kiro/
