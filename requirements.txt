@@ -55,6 +55,9 @@ Pillow==12.2.0
 # --- WSGI Server ---
 gunicorn==23.0.0
 
+# --- Static Files ---
+whitenoise==6.9.0
+
 # --- Email ---
 django-anymail[resend]==13.0
 
