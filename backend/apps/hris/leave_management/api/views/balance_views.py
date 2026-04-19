@@ -10,7 +10,8 @@ from apps.hris.leave_management.api.serializers import (
     LeaveBalanceAdjustSerializer,
 )
 from apps.hris.leave_management.services import LeaveBalanceService
-from apps.hris.leave_management.selectors import LeaveSelector
+from apps.hris.leave_management.selectors.selectors import LeaveSelector
+
 
 
 class EmployeeBalanceSummaryView(APIView):

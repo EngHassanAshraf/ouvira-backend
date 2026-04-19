@@ -13,7 +13,7 @@ class LeaveBalance(TimeStampedModel):
     employee   = models.ForeignKey(
         "hris_core.Employee",
         on_delete=models.CASCADE,
-        related_name="leave_balances",
+        related_name="lm_leave_balances",
         verbose_name=_("Employee")
     )
     leave_type = models.ForeignKey(

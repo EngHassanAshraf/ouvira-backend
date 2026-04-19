@@ -1,0 +1,44 @@
+from django.urls import path
+from apps.hris.leave_management.api.views import (
+    # Employee views
+    LeaveRequestListCreateView,
+    LeaveRequestDetailView,
+    LeaveCancelView,
+    # Manager views
+    ManagerLeaveRequestListView,
+    ManagerApproveView,
+    HRApproveView,
+    DeclineView,
+    InterruptView,
+    BulkApproveView,
+    BulkDeclineView,
+    # Balance views
+    EmployeeBalanceSummaryView,
+    ManagerBalanceSummaryView,
+    BalanceAdjustView,
+    BalanceInitializeView,
+)
+
+app_name = "leave"
+
+urlpatterns = [
+    # ── Employee endpoints ─────────────────────────────────────────────────────
+    path("leave-requests/", LeaveRequestListCreateView.as_view(), name="leave-request-list"),
+    path("leave-requests/<int:pk>/", LeaveRequestDetailView.as_view(), name="leave-request-detail"),
+    path("leave-requests/<int:pk>/cancel/", LeaveCancelView.as_view(), name="leave-request-cancel"),
+
+    # ── Manager endpoints ──────────────────────────────────────────────────────
+    path("manager/leave-requests/", ManagerLeaveRequestListView.as_view(), name="manager-leave-list"),
+    path("manager/leave-requests/<int:pk>/approve/", ManagerApproveView.as_view(), name="manager-approve"),
+    path("manager/leave-requests/<int:pk>/hr-approve/", HRApproveView.as_view(), name="hr-approve"),
+    path("manager/leave-requests/<int:pk>/decline/", DeclineView.as_view(), name="decline"),
+    path("manager/leave-requests/<int:pk>/interrupt/", InterruptView.as_view(), name="interrupt"),
+    path("manager/leave-requests/bulk-approve/", BulkApproveView.as_view(), name="bulk-approve"),
+    path("manager/leave-requests/bulk-decline/", BulkDeclineView.as_view(), name="bulk-decline"),
+
+    # ── Balance endpoints ──────────────────────────────────────────────────────
+    path("balance/", EmployeeBalanceSummaryView.as_view(), name="balance-summary"),
+    path("balance/manager/", ManagerBalanceSummaryView.as_view(), name="manager-balance"),
+    path("balance/adjust/", BalanceAdjustView.as_view(), name="balance-adjust"),
+    path("balance/initialize/", BalanceInitializeView.as_view(), name="balance-initialize"),
+]

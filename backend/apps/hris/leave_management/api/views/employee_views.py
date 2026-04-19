@@ -12,7 +12,7 @@ from apps.hris.leave_management.api.serializers import (
 from apps.hris.leave_management.services import (
     LeaveRequestService,
 )
-from apps.hris.leave_management.selectors import LeaveSelector
+from apps.hris.leave_management.selectors.selectors import LeaveSelector
 
 
 class LeaveRequestListCreateView(APIView):
