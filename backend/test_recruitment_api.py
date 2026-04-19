@@ -2,8 +2,12 @@ import requests
 import json
 import time
 
-BASE_URL = "http://localhost:8000"
-TENANT = "shawahid"
+import os
+
+BASE_URL = os.getenv("TEST_BASE_URL", "http://localhost:8000")
+TENANT = os.getenv("TEST_TENANT", "shawahid")
+TEST_USER = os.getenv("TEST_USER", "root")
+TEST_PASSWORD = os.getenv("TEST_PASSWORD", "changeme")
 
 def log_api_call(name, resp):
     print(f"[{name}] {resp.status_code} {resp.url}")
@@ -25,7 +29,7 @@ def test_recruitment():
     headers = {"X-Tenant": TENANT}
     
     # 1. Login
-    login_data = {"identifier": "root", "password": "Admin123!"}
+    login_data = {"identifier": TEST_USER, "password": TEST_PASSWORD}
     resp = log_api_call("LOGIN", requests.post(f"{BASE_URL}/api/auth/login/", json=login_data, headers=headers))
     if resp.status_code != 200: return
     access_token = resp.json().get("access")

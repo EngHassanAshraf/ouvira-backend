@@ -42,11 +42,14 @@ def setup_data():
         )
 
         # Link user
+        import os
+        dev_password = os.getenv("DEV_SEED_PASSWORD", "changeme")
+        dev_mobile = os.getenv("DEV_SEED_MOBILE", "+10000000000")
         user, created = User.objects.get_or_create(
             username="root",
-            defaults={"full_name": "Root Admin", "primary_mobile": "+201016746713", "is_staff": True, "is_active": True}
+            defaults={"full_name": "Root Admin", "primary_mobile": dev_mobile, "is_staff": True, "is_active": True}
         )
-        user.set_password("Admin123!")
+        user.set_password(dev_password)
         user.is_active = True
         user.failed_login_attempts = 0
         user.locked_until = None
