@@ -175,3 +175,29 @@ class EmployeeDocumentService:
             raise ValueError("Document not found")
         doc.is_deleted = True
         doc.save(update_fields=["is_deleted"])
+
+
+# ── Business Trip Balance ──────────────────────────────────────────────────────
+
+class EmployeeBusinessTripBalanceService:
+
+    @staticmethod
+    @transaction.atomic
+    def set_balance(employee_id: int, **data) -> "EmployeeBusinessTripBalance":  # noqa: F821
+        from apps.hris.hris_core.models.employee_extensions import EmployeeBusinessTripBalance
+        balance, _ = EmployeeBusinessTripBalance.objects.update_or_create(
+            employee_id=employee_id,
+            defaults=data,
+        )
+        logger.info(f"Business trip balance set: employee={employee_id}")
+        return balance
+
+    @staticmethod
+    def delete_balance(employee_id: int) -> None:
+        from apps.hris.hris_core.models.employee_extensions import EmployeeBusinessTripBalance
+        try:
+            balance = EmployeeBusinessTripBalance.objects.get(employee_id=employee_id, is_deleted=False)
+            balance.is_deleted = True
+            balance.save(update_fields=["is_deleted"])
+        except EmployeeBusinessTripBalance.DoesNotExist:
+            raise ValueError(f"Business trip balance not found for employee {employee_id}")

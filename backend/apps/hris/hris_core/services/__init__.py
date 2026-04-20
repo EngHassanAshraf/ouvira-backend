@@ -8,6 +8,7 @@ from .employee_extension_services import (
     EmployeeBankDetailService,
     EmployeeCostService,
     EmployeeDocumentService,
+    EmployeeBusinessTripBalanceService,
 )
 from .employee_bulk_services import (
     BulkArchiveService,

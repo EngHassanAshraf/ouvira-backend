@@ -126,11 +126,26 @@ class EmployeeCost(TimeStampedModel, SoftDeleteModel):
 class EmployeeDocument(TimeStampedModel, SoftDeleteModel):
     """Official documents attached to an employee (passport scan, ID copy, etc.)."""
 
+    class DocumentType(models.TextChoices):
+        PASSPORT = "passport", _("Passport")
+        NATIONAL_ID = "national_id", _("National ID")
+        IQAMA = "iqama", _("Iqama / Residency Permit")
+        VISA = "visa", _("Visa")
+        CONTRACT = "contract", _("Employment Contract")
+        CERTIFICATE = "certificate", _("Certificate")
+        OTHER = "other", _("Other")
+
     employee = models.ForeignKey(
         "hris_core.Employee",
         on_delete=models.CASCADE,
         related_name="documents",
         verbose_name=_("Employee"),
+    )
+    document_type = models.CharField(
+        max_length=20,
+        choices=DocumentType.choices,
+        default=DocumentType.OTHER,
+        verbose_name=_("Document Type"),
     )
     file = models.FileField(
         upload_to="employees/documents/",
@@ -152,3 +167,35 @@ class EmployeeDocument(TimeStampedModel, SoftDeleteModel):
 
     def __str__(self):
         return f"{self.employee} — {self.file_name}"
+
+
+class EmployeeBusinessTripBalance(TimeStampedModel, SoftDeleteModel):
+    """Business trip allowance balance per employee."""
+
+    employee = models.OneToOneField(
+        "hris_core.Employee",
+        on_delete=models.CASCADE,
+        related_name="business_trip_balance",
+        verbose_name=_("Employee"),
+    )
+    total_balance = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0, verbose_name=_("Total Balance")
+    )
+    used_balance = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0, verbose_name=_("Used Balance")
+    )
+    reset_date = models.DateField(
+        blank=True, null=True, verbose_name=_("Balance Reset Date")
+    )
+
+    class Meta:
+        db_table = "hris_employee_business_trip_balances"
+        verbose_name = _("Employee Business Trip Balance")
+        verbose_name_plural = _("Employee Business Trip Balances")
+
+    def __str__(self):
+        return f"{self.employee} — Business Trip ({self.remaining_balance} remaining)"
+
+    @property
+    def remaining_balance(self):
+        return self.total_balance - self.used_balance

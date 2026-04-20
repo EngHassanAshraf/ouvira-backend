@@ -12,6 +12,7 @@ from apps.hris.hris_core.models.employee_extensions import (
     EmployeeBankDetail,
     EmployeeCost,
     EmployeeDocument,
+    EmployeeBusinessTripBalance,
 )
 
 
@@ -119,8 +120,16 @@ class EmployeeCostSerializer(serializers.ModelSerializer):
 class EmployeeDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeDocument
-        fields = ["id", "file", "file_name", "created_at"]
+        fields = ["id", "document_type", "file", "file_name", "created_at"]
         read_only_fields = ["file_name", "created_at"]
+
+
+class EmployeeBusinessTripBalanceSerializer(serializers.ModelSerializer):
+    remaining_balance = serializers.ReadOnlyField()
+
+    class Meta:
+        model = EmployeeBusinessTripBalance
+        fields = ["id", "total_balance", "used_balance", "remaining_balance", "reset_date"]
 
 
 # ── Employee List (table view) ─────────────────────────────────────────────────
@@ -216,6 +225,8 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
             "employee_id",
             "first_name",
             "last_name",
+            # Photo
+            "photo",
             # Identity
             "national_id",
             "national_id_job_title",
@@ -232,7 +243,10 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
             "contact_number",
             "secondary_phone",
             "personal_email",
+            "work_email",
             "address",
+            # Job
+            "job_title",
             # Relations
             "location",
             "department",
@@ -241,8 +255,10 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
             "is_system_user",
         ]
         extra_kwargs = {
-            "employee_id": {"required": True},
-            "company": {"required": False},
+            "employee_id":   {"required": True},
+            "date_of_birth": {"required": True},
+            "gender":        {"required": True},
+            "company":       {"required": False},
         }
 
     def validate_national_id(self, value):
@@ -257,10 +273,6 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_employee_id(self, value):
-        """
-        Enforce s{number} format — e.g. s1001, s2048.
-        The prefix is configurable via settings.EMPLOYEE_ID_PREFIX (default 's').
-        """
         from django.conf import settings
         prefix = getattr(settings, "EMPLOYEE_ID_PREFIX", "s")
         if not value.startswith(prefix):
@@ -304,6 +316,7 @@ class EmployeeDetailSerializer(serializers.ModelSerializer):
     department = DepartmentSerializer(read_only=True)
     location = LocationSerializers(read_only=True)
     reporting_manager = ReportingManagerSerializer(read_only=True)
+    job_title = JobTitleSerializer(read_only=True)
     employee_status = serializers.ReadOnlyField()
     employee_status_badge = serializers.SerializerMethodField()
     employments = EmploymentNestedSerializer(many=True, read_only=True)
@@ -312,6 +325,7 @@ class EmployeeDetailSerializer(serializers.ModelSerializer):
     bank_detail = EmployeeBankDetailSerializer(read_only=True)
     costs = EmployeeCostSerializer(many=True, read_only=True)
     documents = EmployeeDocumentSerializer(many=True, read_only=True)
+    business_trip_balance = EmployeeBusinessTripBalanceSerializer(read_only=True)
 
     def get_employee_status_badge(self, obj):
         return self._STATUS_BADGE_MAP.get(obj.employee_status, obj.employee_status)
@@ -341,7 +355,10 @@ class EmployeeDetailSerializer(serializers.ModelSerializer):
             "contact_number",
             "secondary_phone",
             "personal_email",
+            "work_email",
             "address",
+            # Job
+            "job_title",
             # Relations
             "department",
             "location",
@@ -361,6 +378,7 @@ class EmployeeDetailSerializer(serializers.ModelSerializer):
             "bank_detail",
             "costs",
             "documents",
+            "business_trip_balance",
         ]
 
 
@@ -408,19 +426,22 @@ class BankDetailInlineSerializer(serializers.Serializer):
     bank_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
 
+class BusinessTripBalanceInlineSerializer(serializers.Serializer):
+    """Business trip allowances tab — inline within the full employee create payload."""
+    total_balance = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
+    reset_date = serializers.DateField(required=False, allow_null=True)
+
+
 class EmployeeFullCreateSerializer(serializers.Serializer):
     """
     Single-payload serializer for POST /employees/full/
-    Accepts all form tabs at once:
-      - personal_information  (required)
-      - employment            (optional — creates Employment record)
-      - allowances            (optional list)
-      - bank_detail           (optional)
+    Accepts all form tabs at once.
     """
     # ── Personal Information tab ───────────────────────────────────
     employee_id = serializers.CharField(max_length=50)
     first_name = serializers.CharField(max_length=100)
     last_name = serializers.CharField(max_length=100)
+    photo = serializers.ImageField(required=False, allow_null=True)
     national_id = serializers.CharField(max_length=20)
     national_id_job_title = serializers.CharField(max_length=255, required=False, allow_blank=True)
     national_id_status = serializers.ChoiceField(
@@ -433,10 +454,8 @@ class EmployeeFullCreateSerializer(serializers.Serializer):
     )
     fingerprint_id = serializers.CharField(max_length=100, required=False, allow_blank=True)
     nationality = serializers.CharField(max_length=100, default="Saudi Arabian")
-    date_of_birth = serializers.DateField(required=False, allow_null=True)
-    gender = serializers.ChoiceField(
-        choices=Employee.GenderChoice.choices, required=False, allow_null=True
-    )
+    date_of_birth = serializers.DateField()
+    gender = serializers.ChoiceField(choices=Employee.GenderChoice.choices)
     marital_status = serializers.ChoiceField(
         choices=Employee.MaritalStatusChoice.choices, required=False, allow_null=True
     )
@@ -444,6 +463,11 @@ class EmployeeFullCreateSerializer(serializers.Serializer):
     secondary_phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
     personal_email = serializers.EmailField(required=False, allow_null=True)
     address = serializers.CharField(required=False, allow_blank=True)
+
+    # ── Job Details tab ────────────────────────────────────────────
+    job_title = serializers.PrimaryKeyRelatedField(
+        queryset=JobTitle.objects.all(), required=False, allow_null=True
+    )
     location = serializers.PrimaryKeyRelatedField(
         queryset=__import__('apps.hris.hris_core.models', fromlist=['Location']).Location.objects.all(),
         required=False, allow_null=True,
@@ -455,7 +479,20 @@ class EmployeeFullCreateSerializer(serializers.Serializer):
     reporting_manager = serializers.PrimaryKeyRelatedField(
         queryset=Employee.objects.all(), required=False, allow_null=True
     )
+
+    # ── Account Information tab ────────────────────────────────────
+    # work_email is the system/login email stored on Employee
+    work_email = serializers.EmailField(required=False, allow_null=True)
     is_system_user = serializers.BooleanField(default=False)
+    # password fields — only used when is_system_user=True
+    password = serializers.CharField(
+        max_length=128, required=False, allow_blank=True, write_only=True,
+        style={"input_type": "password"},
+    )
+    password_confirm = serializers.CharField(
+        max_length=128, required=False, allow_blank=True, write_only=True,
+        style={"input_type": "password"},
+    )
 
     # ── Employment tab (optional) ──────────────────────────────────
     employment = EmploymentCreateInlineSerializer(required=False)
@@ -465,6 +502,9 @@ class EmployeeFullCreateSerializer(serializers.Serializer):
 
     # ── Bank Details tab (optional) ───────────────────────────────
     bank_detail = BankDetailInlineSerializer(required=False)
+
+    # ── Business Trip Allowances tab (optional) ───────────────────
+    business_trip_balance = BusinessTripBalanceInlineSerializer(required=False)
 
     def validate_national_id(self, value):
         if not value.isdigit() or len(value) != 10:
@@ -481,3 +521,25 @@ class EmployeeFullCreateSerializer(serializers.Serializer):
                 _(f"Employee ID must be '{prefix}' followed by digits (e.g. {prefix}1001).")
             )
         return value
+
+    def validate(self, attrs):
+        is_system_user = attrs.get("is_system_user", False)
+        password = attrs.get("password", "")
+        password_confirm = attrs.get("password_confirm", "")
+
+        if is_system_user:
+            if not password:
+                raise serializers.ValidationError(
+                    {"password": _("Password is required when creating a system user.")}
+                )
+            if password != password_confirm:
+                raise serializers.ValidationError(
+                    {"password_confirm": _("Passwords do not match.")}
+                )
+            # Basic strength check
+            if len(password) < 8:
+                raise serializers.ValidationError(
+                    {"password": _("Password must be at least 8 characters.")}
+                )
+
+        return attrs

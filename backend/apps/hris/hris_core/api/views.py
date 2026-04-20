@@ -892,7 +892,7 @@ class EmployeeExportApiView(APIView):
 # ── Full Employee Create (single-payload, all tabs) ────────────────────────────
 
 from apps.hris.hris_core.api.serializers import EmployeeFullCreateSerializer
-from apps.hris.hris_core.services import EmployeeFullCreateService
+from apps.hris.hris_core.services import EmployeeFullCreateService, EmployeeBusinessTripBalanceService
 
 
 class EmployeeFullCreateApiView(APIView):
@@ -954,3 +954,42 @@ class EmployeeFullCreateApiView(APIView):
             EmployeeDetailSerializer(employee).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+# ── Business Trip Balance ──────────────────────────────────────────────────────
+
+from apps.hris.hris_core.api.serializers import EmployeeBusinessTripBalanceSerializer
+from apps.hris.hris_core.models.employee_extensions import EmployeeBusinessTripBalance
+
+
+class EmployeeBusinessTripBalanceApiView(APIView):
+    """
+    GET  /employees/<pk>/business-trip-balance/  — retrieve
+    PUT  /employees/<pk>/business-trip-balance/  — create or update
+    DELETE /employees/<pk>/business-trip-balance/ — soft-delete
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request, employee_pk):
+        try:
+            balance = EmployeeBusinessTripBalance.objects.get(
+                employee_id=employee_pk, is_deleted=False
+            )
+        except EmployeeBusinessTripBalance.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(EmployeeBusinessTripBalanceSerializer(balance).data)
+
+    def put(self, request, employee_pk):
+        serializer = EmployeeBusinessTripBalanceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        balance = EmployeeBusinessTripBalanceService.set_balance(
+            employee_id=employee_pk, **serializer.validated_data
+        )
+        return Response(EmployeeBusinessTripBalanceSerializer(balance).data)
+
+    def delete(self, request, employee_pk):
+        try:
+            EmployeeBusinessTripBalanceService.delete_balance(employee_id=employee_pk)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
