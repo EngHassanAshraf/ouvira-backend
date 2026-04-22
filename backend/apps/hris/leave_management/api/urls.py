@@ -17,6 +17,10 @@ from apps.hris.leave_management.api.views import (
     ManagerBalanceSummaryView,
     BalanceAdjustView,
     BalanceInitializeView,
+    LeaveActivityLogListAPIView,
+
+    LeavePDFExportView,
+    ManagerLeavePDFExportView,
 )
 
 app_name = "leave"
@@ -35,10 +39,15 @@ urlpatterns = [
     path("manager/leave-requests/<int:pk>/interrupt/", InterruptView.as_view(), name="interrupt"),
     path("manager/leave-requests/bulk-approve/", BulkApproveView.as_view(), name="bulk-approve"),
     path("manager/leave-requests/bulk-decline/", BulkDeclineView.as_view(), name="bulk-decline"),
+    path("activity-logs/", LeaveActivityLogListAPIView.as_view(), name="activity-logs"),
 
     # ── Balance endpoints ──────────────────────────────────────────────────────
     path("balance/", EmployeeBalanceSummaryView.as_view(), name="balance-summary"),
-    path("balance/manager/", ManagerBalanceSummaryView.as_view(), name="manager-balance"),
-    path("balance/adjust/", BalanceAdjustView.as_view(), name="balance-adjust"),
-    path("balance/initialize/", BalanceInitializeView.as_view(), name="balance-initialize"),
+    path("balance/manager/<int:employee_pk>/", ManagerBalanceSummaryView.as_view()),
+    path("balance/adjust/<int:employee_pk>/", BalanceAdjustView.as_view()),
+    path("balance/initialize/<int:employee_pk>/", BalanceInitializeView.as_view()),
+
+    # ── PDF Export endpoints ───────────────────────────────────────────────────
+    path("leave-requests/<int:pk>/export-pdf/", LeavePDFExportView.as_view(), name="leave-export-pdf"),
+    path("manager/leave-requests/<int:pk>/export-pdf/", ManagerLeavePDFExportView.as_view(), name="manager-leave-export-pdf"),
 ]

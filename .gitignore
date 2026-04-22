@@ -14,3 +14,4 @@ geoip
 railway_services_env/
 tatus
 .kiro
+apps/hris/leave_management/fonts/*.ttf

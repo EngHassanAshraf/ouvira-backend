@@ -12,7 +12,29 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
 
 
 class LeaveRequestCreateSerializer(serializers.ModelSerializer):
-    """Yangi so'rov yaratish uchun"""
+    def validate_attachment(self, value):
+        if value is None:
+            return value
+        max_size = 5 * 1024 * 1024 # 5 mb bytesda
+        if value.size > max_size:
+            raise serializers.ValidationError("Fail size exceeds the 5mb limit")
+
+        #file turi PDF , LPG, PNG, DOCX
+        allowed_types = [
+           "application/pdf",
+            "image/jpeg",
+            "image/png",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ]
+        if value.content_type  not in allowed_types:
+            raise serializers.ValidationError(
+                "Unsupported file type. Alowed types: PDF JPG PNG DOCX"
+            )
+        
+        return value
+
+
+
     class Meta:
         model = LeaveRequest
         fields = [
@@ -123,6 +145,7 @@ class LeaveBalanceAdjustSerializer(serializers.Serializer):
 class LeaveActivityLogSerializer(serializers.ModelSerializer):
     """Activity log uchun"""
     performed_by_name = serializers.SerializerMethodField()
+    action_display = serializers.CharField(source="get_action_display", read_only=True)
 
     def get_performed_by_name(self, obj):
         if obj.performed_by:
@@ -132,6 +155,12 @@ class LeaveActivityLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveActivityLog
         fields = [
-            "id", "action", "performed_by_name",
-            "note", "created_at",
+            "id",
+            "leave_request",
+            "action",
+            'action_display',
+            "performed_by_name",
+            "note",
+            "created_at",
         ]
+

@@ -145,8 +145,14 @@ class LeaveRequestService:
         ]:
             raise ValidationError("This request cannot be cancelled.")
 
-        if leave_request.start_date <= timezone.now().date():
-            raise ValidationError("You can only cancel requests before the leave start date.")
+        if leave_request.status == LeaveRequest.StatusChoice.APPROVED:
+            from apps.hris.leave_management.services.leave_balance_services import LeaveBalanceService
+            LeaveBalanceService.refund_balance(
+                employee_id=leave_request.employee_id,
+                leave_type_id=leave_request.leave_type_id,
+                year=leave_request.start_date.year,
+                days=leave_request.duration,
+            )
 
         leave_request.status = LeaveRequest.StatusChoice.CANCELLED
         leave_request.cancelled_at = timezone.now()

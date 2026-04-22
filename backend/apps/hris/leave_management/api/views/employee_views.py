@@ -31,9 +31,11 @@ class LeaveRequestListCreateView(APIView):
         leave_requests = LeaveSelector.get_employee_requests(
             employee_id=employee_id,
             status=request.query_params.get("status"),
-            leave_type_id=request.query_params.get("leave_type_id"),
+            leave_type_ids=request.query_params.get("leave_type_id"),
             start_date=request.query_params.get("start_date"),
             end_date=request.query_params.get("end_date"),
+            duration_min=request.query_params.get("duration_min"),
+            duration_max=request.query_params.get("duration_max"),
             ordering=request.query_params.get("ordering", "-created_at"),
         )
         serializer = LeaveRequestListSerializer(leave_requests, many=True)

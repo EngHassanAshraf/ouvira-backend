@@ -81,3 +81,7 @@ types-PyYAML==6.0.12.20250915
 types-requests==2.32.4.20250913
 tomli==2.3.0
 wheel==0.45.1
+
+reportlab==4.4.1
+arabic-reshaper==3.0.0
+python-bidi==0.6.6
