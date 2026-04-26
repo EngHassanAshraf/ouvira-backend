@@ -11,10 +11,9 @@ from apps.hris.leave_management.api.serializers import (
     InterruptSerializer,
     BulkActionSerializer,
 )
-from apps.hris.leave_management.services import (
-    LeaveApprovalService,
-)
+from apps.hris.leave_management.services import (LeaveApprovalService,)
 from apps.hris.leave_management.selectors.selectors import LeaveSelector
+from apps.access_control.permissions.HasModulePermission import make_permission
 
 
 class ManagerLeaveRequestListView(APIView):
@@ -46,7 +45,7 @@ class ManagerApproveView(APIView):
     POST — 1-bosqich: Direct Manager tasdiqlaydi
     PENDING → MANAGER_APPROVED
     """
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, make_permission("leave.approve_request")]
 
     def post(self, request, pk):
         manager_id = request.user.employee_id
@@ -65,7 +64,7 @@ class HRApproveView(APIView):
     POST — 2-bosqich: HR Director tasdiqlaydi
     MANAGER_APPROVED → APPROVED
     """
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, make_permission("leave.approve_request")]
 
     def post(self, request, pk):
         hr_id = request.user.employee_id
@@ -83,7 +82,7 @@ class DeclineView(APIView):
     """
     POST — Rad etish (istalgan bosqichda, reason majburiy)
     """
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, make_permission("leave.approve_request")]
 
     def post(self, request, pk):
         serializer = DeclineSerializer(data=request.data)

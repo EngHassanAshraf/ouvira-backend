@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from apps.hris.leave_management.models import (
     LeaveBalance, LeaveBalanceAdjustment, LeaveType
 )
+from hris_core.models import employee
 
 logger = logging.getLogger(__name__)
 
@@ -145,3 +146,157 @@ class LeaveBalanceService:
         if not balance:
             raise ValueError("Leave balance not found for this employee and leave type.")
         return balance
+
+
+    @staticmethod
+    @transaction.atomic
+    def bulk_initialize_form_csv(rows:list, company_id:int, adjusted_by_id:int, )->dict:
+        """
+        EN: Bulk initialize balance from csv rows
+        UZ: csv qatorlaridan ommaviy balanse yaratish
+
+
+        rows format:
+        [
+            {
+                "employee_id": 101,
+                "leave_type_code":"annual",
+                "year": 2026,
+                "total_days": 21
+            },
+            ...
+        ]
+        """
+
+        from apps.hris.leave_management.models import LeaveBalance, LeaveType
+        from apps.hris.hris_core.models import Employee
+
+        success = 0
+        failed = []
+
+        for index, row in enumerate(rows, start=2):
+            try:
+                #1 Employee Tekshiruvi
+                employee = Employee.objects.filter(
+                    id=row.get("employee_id"),
+                    company_id=company_id,
+                    is_deleted=False,
+                ).first()
+                if not employee:
+                    failed.append({
+                        "row":index,
+                        "error":f"Employee not found: {row.get('employee_id')}"
+                    })
+                    continue
+
+                #2 Leave type tekshiruvi
+                leave_type = LeaveType.objects.filter(
+                    code=row.get("leave_type_code"),
+                    is_active=True,
+                    is_deleted=False,
+                ).first()
+                if not leave_type:
+                    failed.append({
+                        "row": index,
+                        "error": f"Invalid leave type: {row.get('leave_type_code')}"
+                    })
+                    continue
+
+
+                #3  year tekshiruvi
+                year = row.get("year")
+                if not year or not str(year).isdigit():
+                    failed.append({
+                        "row": index,
+                        "error": f"Invalid year: {year}"
+                    })
+                    continue
+
+                #4 Total das tekshiruv
+                total_days = row.get("total_days")
+                if total_days is None or float(total_days) < 0:
+                    failed.append({
+                        "row": index,
+                        "error": f"Invalid total_days: {total_days}"
+                    })
+                    continue
+
+                #5 Balans yaratish yokiy  ynagilash
+                LeaveBalance.objects.update_or_create(
+                    employee=employee,
+                    leave_type=leave_type,
+                    year=int(year),
+                    defaults={"total_days": float(total_days)}
+                )
+                success +=1
+
+            except Exception as e:
+                failed.append({
+                    "row": index,
+                    "error": str(e)
+                })
+                continue
+
+        return {
+            "success": success,
+            "failed": failed,
+            "total": len(rows),
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

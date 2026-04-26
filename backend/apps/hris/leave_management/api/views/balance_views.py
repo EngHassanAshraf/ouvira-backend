@@ -11,6 +11,7 @@ from apps.hris.leave_management.api.serializers import (
 )
 from apps.hris.leave_management.services import LeaveBalanceService
 from apps.hris.leave_management.selectors.selectors import LeaveSelector
+from apps.access_control.permissions.HasModulePermission import make_permission
 
 
 
@@ -54,7 +55,7 @@ class BalanceAdjustView(APIView):
     Menejer — xodim balansini qo'lda o'zgartirish (+/-)
     Justification majburiy
     """
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, make_permission("leave.approve_request")]
 
     def post(self, request, employee_pk):
         serializer = LeaveBalanceAdjustSerializer(data=request.data)
@@ -81,7 +82,7 @@ class BalanceInitializeView(APIView):
     Xodim uchun yangi yillik balans yaratish
     Yil boshida yoki yangi xodim qo'shilganda ishlatiladi
     """
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, make_permission("leave.approve_request")]
 
     def post(self, request, employee_pk):
         serializer = LeaveBalanceAdjustSerializer(data=request.data)

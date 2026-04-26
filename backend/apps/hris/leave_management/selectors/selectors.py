@@ -2,6 +2,8 @@ import logging
 
 from django.db import models
 from django.db.models import QuerySet
+from twilio.rest.api.v2010.account import balance
+
 from apps.hris.leave_management.models import LeaveRequest, LeaveBalance
 from django.db.models import Q
 
@@ -220,3 +222,35 @@ class LeaveSelector:
             qs = qs.filter(action=action)
 
         return  qs
+
+
+    @staticmethod
+    def get_balance_adjustments(
+            company_id: int,
+            employee_id: int = None,
+            leave_type_id: int = None,
+            year: int =None
+    )-> QuerySet:
+        """
+            EN: Retuen Balance adjustment history for a company
+            UZ: Kompaniya bo'yicha balanse o"zgartirsh  tarixini qaytaradi
+        """
+        from apps.hris.leave_management.models import LeaveBalanceAdjustment
+
+        qs = LeaveBalanceAdjustment.objects.filter(
+            balance__employee__company_id=company_id,
+            is_deleted=False,
+        ).select_related(
+            "balance__employee",
+            "balance__leave_type",
+            "adjusted_by",
+        ).order_by("-create_at")
+
+        if employee_id:
+            qs = qs.filter(balance__employee_id=employee_id)
+        if leave_type_id:
+            qs = qs.filter(balance__leave_type_id=leave_type_id)
+        if year:
+            qs =qs.filter(balance__year=year)
+
+        return qs

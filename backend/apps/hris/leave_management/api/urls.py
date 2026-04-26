@@ -21,7 +21,10 @@ from apps.hris.leave_management.api.views import (
 
     LeavePDFExportView,
     ManagerLeavePDFExportView,
+    LeaveBalanceAdjustmentLogView,
+    LeaveBalanceCSVImportView,
 )
+from leave_management.api.views.balance_import_view import LeaveBalanceCSVTemplateView
 
 app_name = "leave"
 
@@ -50,4 +53,8 @@ urlpatterns = [
     # ── PDF Export endpoints ───────────────────────────────────────────────────
     path("leave-requests/<int:pk>/export-pdf/", LeavePDFExportView.as_view(), name="leave-export-pdf"),
     path("manager/leave-requests/<int:pk>/export-pdf/", ManagerLeavePDFExportView.as_view(), name="manager-leave-export-pdf"),
+    path("balance/adjustment-log/",LeaveBalanceAdjustmentLogView.as_view(),name="leave-balance-adjustment-log"),
+    path("balance/import-csv/", LeaveBalanceCSVImportView.as_view(), name="leave-balance-import-csv"),
+    path("balance/import-csv/template/",LeaveBalanceCSVTemplateView.as_view(),name="leave-balance-csv-template"
+),
 ]
