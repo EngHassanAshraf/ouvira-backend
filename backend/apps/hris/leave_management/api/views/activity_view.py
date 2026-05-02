@@ -5,7 +5,7 @@ from drf_yasg.utils import swagger_auto_schema
 
 from ...selectors.selectors import LeaveSelector
 from ..serializers import LeaveActivityLogSerializer
-from internal_auth.services.permission_resolver import PermissionResolver
+from apps.hris.internal_auth.services.permission_resolver import PermissionResolver
 
 
 class LeaveActivityLogListAPIView(APIView):

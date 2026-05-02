@@ -1,14 +1,11 @@
-from django.db.migrations import serializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from drf_yasg.utils import swagger_auto_schema
 
-import company
 from apps.access_control.permissions.HasModulePermission import make_permission
 from apps.hris.leave_management.selectors.selectors import LeaveSelector
 from apps.hris.leave_management.api.serializers import LeaveBalanceAdjustmentLogSerializer
-from tenant.models import Tenant
 
 
 class LeaveBalanceAdjustmentLogView(APIView):

@@ -24,7 +24,7 @@ from apps.hris.leave_management.api.views import (
     LeaveBalanceAdjustmentLogView,
     LeaveBalanceCSVImportView,
 )
-from leave_management.api.views.balance_import_view import LeaveBalanceCSVTemplateView
+from apps.hris.leave_management.api.views.balance_import_view import LeaveBalanceCSVTemplateView
 
 app_name = "leave"
 
