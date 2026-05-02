@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from apps.hris.leave_management.models import (
     LeaveBalance, LeaveBalanceAdjustment, LeaveType
 )
-from hris_core.models import employee
+from apps.hris.hris_core.models import employee
 
 logger = logging.getLogger(__name__)
 
@@ -152,20 +152,18 @@ class LeaveBalanceService:
     @transaction.atomic
     def bulk_initialize_form_csv(rows:list, company_id:int, adjusted_by_id:int, )->dict:
         """
-        EN: Bulk initialize balance from csv rows
-        UZ: csv qatorlaridan ommaviy balanse yaratish
+            EN: Bulk initialize balance from csv rows
+            UZ: csv qatorlaridan ommaviy balanse yaratish
 
 
-        rows format:
-        [
-            {
-                "employee_id": 101,
-                "leave_type_code":"annual",
-                "year": 2026,
-                "total_days": 21
-            },
-            ...
-        ]
+            rows format:
+                {
+                    "employee_id": 101,
+                    "leave_type_code":"annual",
+                    "year": 2026,
+                    "total_days": 21
+                },
+                ...
         """
 
         from apps.hris.leave_management.models import LeaveBalance, LeaveType
