@@ -42,6 +42,16 @@ ARG MAXMIND_LICENSE_KEY
 RUN chmod +x /usr/local/bin/download_geoip.sh && \
     /usr/local/bin/download_geoip.sh /var/opt/geoip
 
+# Collect static files at build time so WhiteNoise has them regardless of how
+# the container is started (Railway startCommand bypasses the entrypoint).
+# SECRET_KEY is a dummy value — collectstatic does not need a real one.
+RUN SECRET_KEY=build-time-placeholder \
+    DJANGO_SETTINGS_MODULE=config.settings.production \
+    ALLOWED_HOSTS=localhost \
+    DB_HOST=localhost DB_PORT=5432 \
+    POSTGRES_DB=placeholder POSTGRES_USER=placeholder POSTGRES_PASSWORD=placeholder \
+    python manage.py collectstatic --noinput --clear 2>&1 || true
+
 # Fix permissions
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/download_geoip.sh && \
     mkdir -p /app/geoip && \

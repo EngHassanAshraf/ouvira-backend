@@ -3,7 +3,7 @@ builder = "dockerfile"
 dockerfilePath = "docker/Dockerfile"
 buildArgs = { MAXMIND_LICENSE_KEY = "${{MAXMIND_LICENSE_KEY}}" }
 
-# cache bust: 12
+# cache bust: 13
 
 [deploy]
 startCommand = "gunicorn config.wsgi:application --config gunicorn.conf.py"
