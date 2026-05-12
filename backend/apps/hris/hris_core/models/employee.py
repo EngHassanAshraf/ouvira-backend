@@ -131,6 +131,24 @@ class Employee(TimeStampedModel, SoftDeleteModel):
         verbose_name=_("Profile Photo"),
     )
 
+    # Job title (direct FK for Figma "job title" field in Job Details tab)
+    job_title = models.ForeignKey(
+        "hris_core.JobTitle",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employees",
+        verbose_name=_("Job Title"),
+    )
+
+    # Work email (system/company email — distinct from personal_email)
+    work_email = models.EmailField(
+        blank=True,
+        null=True,
+        verbose_name=_("Work Email"),
+        help_text=_("Company/system email address used for login"),
+    )
+
     # System user flag
     is_system_user = models.BooleanField(
         default=False, verbose_name=_("Active System User")

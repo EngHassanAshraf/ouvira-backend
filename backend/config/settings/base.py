@@ -152,6 +152,7 @@ SESSION_SAVE_EVERY_REQUEST = False
 MIDDLEWARE = [
     "apps.tenant.middleware.HeaderTenantMainMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",

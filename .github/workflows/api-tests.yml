@@ -54,7 +54,7 @@ jobs:
       CELERY_RESULT_BACKEND: redis://localhost:6379/0
       DJANGO_SETTINGS_MODULE: config.settings.local
       TENANT_BASE_DOMAIN: localhost
-      TURNSTILE_BYPASS_TOKEN: kJ8mP2xQnR5vY9wL3tA6bN1cE4hG7fD0
+      TURNSTILE_BYPASS_TOKEN: ${{ secrets.CI_TURNSTILE_BYPASS_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -82,18 +82,22 @@ jobs:
 
       - name: Create superuser for tests
         working-directory: backend
+        env:
+          CI_SEED_PASSWORD: ${{ secrets.CI_SEED_PASSWORD }}
+          CI_SEED_MOBILE: ${{ secrets.CI_SEED_MOBILE }}
         run: |
           python manage.py shell -c "
           from django_tenants.utils import schema_context
+          import os
           with schema_context('public'):
               from django.contrib.auth import get_user_model
               User = get_user_model()
               if not User.objects.filter(username='root').exists():
-                  u = User.objects.create_superuser('root', 'root@ouvira.com', 'Admin123!')
+                  u = User.objects.create_superuser('root', 'root@ouvira.com', os.environ['CI_SEED_PASSWORD'])
                   u.is_active = True
                   u.phone_verified = True
                   u.email_verified = True
-                  u.primary_mobile = '+201016746713'
+                  u.primary_mobile = os.environ.get('CI_SEED_MOBILE', '+10000000000')
                   u.full_name = 'Root Admin'
                   u.save()
                   print('Superuser created')
@@ -118,9 +122,13 @@ jobs:
         run: npm install -g newman newman-reporter-htmlextra newman-reporter-junit
 
       - name: Patch environment for CI base_url
+        env:
+          CI_TURNSTILE_BYPASS_TOKEN: ${{ secrets.CI_TURNSTILE_BYPASS_TOKEN }}
+          CI_SEED_PASSWORD: ${{ secrets.CI_SEED_PASSWORD }}
+          CI_SEED_MOBILE: ${{ secrets.CI_SEED_MOBILE }}
         run: |
           python -c "
-          import json
+          import json, os
           with open('postman/tests/Ouvira_QA.postman_environment.json') as f:
               env = json.load(f)
           for v in env['values']:
@@ -129,7 +137,7 @@ jobs:
               if v['key'] == 'tenant':
                   v['value'] = 'shawahid'
               if v['key'] == 'turnstile_bypass':
-                  v['value'] = 'kJ8mP2xQnR5vY9wL3tA6bN1cE4hG7fD0'
+                  v['value'] = os.environ.get('CI_TURNSTILE_BYPASS_TOKEN', '')
           with open('postman/tests/Ouvira_QA.postman_environment.json', 'w') as f:
               json.dump(env, f, indent=2)
           print('Environment patched for CI')

@@ -45,6 +45,8 @@ from apps.hris.hris_core.api.views import (
     # Attendance
     AttendanceListCreateApiView,
     AttendanceDetailApiView,
+    # Business Trip Balance
+    EmployeeBusinessTripBalanceApiView,
 )
 
 app_name = "hris-core"
@@ -117,4 +119,8 @@ urlpatterns = [
          AttendanceListCreateApiView.as_view(), name="attendance-list"),
     path("employees/<int:employee_pk>/attendances/<int:pk>/",
          AttendanceDetailApiView.as_view(), name="attendance-detail"),
+
+    # ── Business Trip Balance (singleton nested) ───────────────────────────────
+    path("employees/<int:employee_pk>/business-trip-balance/",
+         EmployeeBusinessTripBalanceApiView.as_view(), name="business-trip-balance"),
 ]

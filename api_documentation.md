@@ -1,7 +1,7 @@
 # Ouvira API Documentation
 
 **Version:** v1
-**Base URL:** `http://localhost:8000` (development) | `https://api.ouvira.com` (production)
+**Base URL:** `http://localhost:8000` (development) | `https://ouvira0.up.railway.app` (production)
 **Content-Type:** `application/json`
 
 ---
@@ -18,6 +18,8 @@
    - [Access Control](#4-access-control--apiv1access-control)
    - [Company](#5-company--apiv1company)
    - [HRIS Core](#6-hris-core--apiv1hriscore)
+   - [Leave Management](#61-leave-management--apiv1hris)
+   - [Travel Management](#62-travel-management--apiv1hris)
    - [Recruitment](#7-recruitment--apiv1hrisrecruitment)
    - [Audit](#8-audit--apiv1audit)
 5. [Utility Endpoints](#utility-endpoints)
@@ -580,18 +582,24 @@ Returns paginated list of active users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET/POST | `/api/v1/hris/core/employees/` | List / create |
+| GET | `/api/v1/hris/core/employees/` | List active employees |
+| POST | `/api/v1/hris/core/employees/` | Create employee |
 | GET/PUT/PATCH/DELETE | `/api/v1/hris/core/employees/{id}/` | Detail / update / soft-delete |
-| GET/POST | `/api/v1/hris/core/employees/{id}/employments/` | List / create employment records |
-| GET/PUT/PATCH/DELETE | `/api/v1/hris/core/employees/{id}/employments/{eid}/` | Employment detail |
-| GET/POST | `/api/v1/hris/core/employees/{id}/attendances/` | List / create attendance |
-| GET/PUT/PATCH/DELETE | `/api/v1/hris/core/employees/{id}/attendances/{aid}/` | Attendance detail |
+| POST | `/api/v1/hris/core/employees/{id}/restore/` | Restore archived employee |
+| GET | `/api/v1/hris/core/employees/archived/` | List archived employees |
+| POST | `/api/v1/hris/core/employees/full/` | Create employee + all tabs in one payload |
+| POST | `/api/v1/hris/core/employees/bulk-archive/` | Bulk archive |
+| POST | `/api/v1/hris/core/employees/bulk-restore/` | Bulk restore |
+| POST | `/api/v1/hris/core/employees/import/` | Import from Excel (`multipart/form-data`) |
+| GET | `/api/v1/hris/core/employees/export/` | Export to CSV |
+
+**List filters:** `?search=`, `?department=`, `?location=`, `?ordering=`
 
 **Employee object:**
 ```json
 {
   "id": 1,
-  "employee_id": "EMP-001",
+  "employee_id": "s001",
   "first_name": "Ahmed",
   "last_name": "Mohamed",
   "national_id": "1234567890",
@@ -599,11 +607,100 @@ Returns paginated list of active users.
   "gender": "M",
   "marital_status": "M",
   "contact_number": "+966501234567",
+  "secondary_phone": null,
   "personal_email": "ahmed@example.com",
+  "address": null,
+  "photo": null,
+  "visa_number": null,
+  "fingerprint_id": null,
+  "national_id_status": null,
+  "iqama_status": null,
+  "reporting_manager": null,
+  "is_system_user": false,
+  "employee_status": "active",
+  "employee_status_badge": "active",
   "company": 1,
   "department": 1,
   "location": 1
 }
+```
+
+**Bulk archive/restore request:**
+```json
+{ "ids": [1, 2, 3] }
+```
+
+**Full create request (all tabs):**
+```json
+{
+  "employee_id": "s001",
+  "first_name": "Ahmed",
+  "last_name": "Mohamed",
+  "employment": { "employment_type": "full_time", "status": "active" },
+  "allowances": [{ "name": "Housing", "value": "2000.00" }],
+  "bank_detail": { "iban": "SA1234567890", "bank_name": "Al Rajhi" }
+}
+```
+
+---
+
+#### Employee Nested Resources
+
+All nested under `/api/v1/hris/core/employees/{id}/`
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `employments/` | List / create employment records |
+| GET/PUT/PATCH/DELETE | `employments/{eid}/` | Employment detail |
+| GET/POST | `leave-balances/` | List / create leave balances |
+| GET/PUT/PATCH/DELETE | `leave-balances/{bid}/` | Leave balance detail |
+| GET/POST | `allowances/` | List / create allowances |
+| GET/PUT/PATCH/DELETE | `allowances/{aid}/` | Allowance detail |
+| GET/PUT/PATCH | `bank-detail/` | Get / upsert bank detail (singleton) |
+| GET/POST | `costs/` | List / create cost records |
+| GET/PUT/PATCH/DELETE | `costs/{cid}/` | Cost detail |
+| GET/POST | `documents/` | List / upload documents |
+| GET/PUT/PATCH/DELETE | `documents/{did}/` | Document detail |
+| GET/POST | `attendances/` | List / create attendance |
+| GET/PUT/PATCH/DELETE | `attendances/{aid}/` | Attendance detail |
+
+**Employment object:**
+```json
+{
+  "id": 1,
+  "employee": 1,
+  "employment_type": "full_time",
+  "contract_type": "permanent",
+  "status": "active",
+  "start_date": "2026-01-01",
+  "end_date": null,
+  "employment_type_display": "Full Time"
+}
+```
+
+**Leave balance object:**
+```json
+{ "id": 1, "employee": 1, "leave_type": 1, "total": 21, "used": 5, "reset_date": "2027-01-01" }
+```
+
+**Allowance object:**
+```json
+{ "id": 1, "employee": 1, "name": "Housing", "value": "2000.00" }
+```
+
+**Bank detail object:**
+```json
+{ "employee": 1, "iban": "SA1234567890", "bank_name": "Al Rajhi" }
+```
+
+**Cost object:**
+```json
+{ "id": 1, "employee": 1, "cost_type": "salary", "value": "25000.00", "date": "2026-04-01" }
+```
+
+**Document object:**
+```json
+{ "id": 1, "employee": 1, "document_type": "id_copy", "file": "/media/docs/id.pdf", "uploaded_at": "2026-04-01T10:00:00Z" }
 ```
 
 **Attendance object:**
@@ -653,6 +750,78 @@ Returns paginated list of active users.
 |--------|----------|-------------|
 | GET/POST | `/api/v1/hris/core/locations/` | List / create |
 | GET/PUT/PATCH/DELETE | `/api/v1/hris/core/locations/{id}/` | Detail / update / soft-delete |
+
+---
+
+### 6.1 Leave Management — `/api/v1/hris/`
+
+#### Leave Types
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/v1/hris/leave-types/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/leave-types/{id}/` | Detail / update / delete |
+
+**Requires:** `leave.manage_types` permission
+
+**Object:**
+```json
+{ "id": 1, "name": "Annual Leave", "max_days": 21, "company": 1 }
+```
+
+---
+
+#### Leave Requests
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/v1/hris/leave-requests/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/leave-requests/{id}/` | Detail / update / delete |
+| POST | `/api/v1/hris/leave-requests/{id}/approve/` | Approve — requires `leave.approve_request` |
+| POST | `/api/v1/hris/leave-requests/{id}/reject/` | Reject — requires `leave.reject_request` |
+| POST | `/api/v1/hris/leave-requests/{id}/cancel/` | Cancel own request |
+
+**List filters:** `?employee=`, `?leave_type=`, `?status=`, `?search=`, `?ordering=`
+
+**Object:**
+```json
+{
+  "id": 1,
+  "employee": 1,
+  "leave_type": 1,
+  "start_date": "2026-05-01",
+  "end_date": "2026-05-05",
+  "reason": "Family vacation",
+  "status": "pending"
+}
+```
+
+**Status lifecycle:** `pending` → `approved` | `rejected` | `cancelled`
+
+---
+
+### 6.2 Travel Management — `/api/v1/hris/`
+
+#### Travel Requests
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/v1/hris/travel-requests/` | List / create |
+| GET/PUT/PATCH/DELETE | `/api/v1/hris/travel-requests/{id}/` | Detail / update / delete |
+
+**List filters:** `?employee=`, `?status=`, `?search=`, `?ordering=`
+
+**Object:**
+```json
+{
+  "id": 1,
+  "employee": 1,
+  "destination": "Dubai, UAE",
+  "purpose": "Client meeting",
+  "departure_date": "2026-05-10",
+  "return_date": "2026-05-12",
+  "status": "pending"
+}
 
 ---
 
@@ -1271,7 +1440,24 @@ Added `birth_certificate` to the `doc_type` choices:
 | POST | `/api/v1/audit/notifications/mark-read/` | Mark notifications as read |
 | GET | `/api/v1/audit/activity-logs/` | List all activity logs (admin) |
 | GET | `/api/v1/audit/activity-logs/my/` | List my activity logs |
+| GET | `/api/v1/audit/activity-logs/employees/{id}/` | Activity log for a specific employee |
 | GET | `/api/v1/audit/security-logs/` | List security audit logs (admin) |
+
+**Activity log filters:** `?entity_type=`, `?action=`, `?search=`, `?ordering=`
+
+**Activity log object:**
+```json
+{
+  "id": 1,
+  "entity_type": "Employee",
+  "entity_id": 5,
+  "action": "updated",
+  "old_values": { "first_name": "Ali" },
+  "new_values": { "first_name": "Ahmed" },
+  "performed_by": 3,
+  "ip_address": "192.168.1.1",
+  "created_at": "2026-04-18T10:00:00Z"
+}
 
 ---
 

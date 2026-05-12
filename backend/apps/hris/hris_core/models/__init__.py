@@ -8,4 +8,5 @@ from .employee_extensions import (
     EmployeeBankDetail,
     EmployeeCost,
     EmployeeDocument,
+    EmployeeBusinessTripBalance,
 )

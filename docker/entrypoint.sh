@@ -62,31 +62,16 @@ validate_migrations() {
     echo "Migration validation skipped for multi-tenant setup."
 }
 
-# Run migrations if enabled
-if [ "$RUN_MIGRATIONS" = "true" ]; then
-    log "Running database migrations..."
-    
-    # Check database connectivity first
-    check_db
-    
-    # Run migrations
-    python manage.py migrate_schemas --shared
-    
-    # Validate migrations completed successfully
-    validate_migrations
-    
-    log "Migrations completed successfully."
-else
-    log "Skipping migrations (RUN_MIGRATIONS is not 'true')."
-    # Still check for pending migrations as a warning
-    check_migrations
-fi
+# Run migrations — always run on startup
+log "Running database migrations..."
+check_db
+python manage.py migrate_schemas --shared
+validate_migrations
+log "Migrations completed successfully."
 
-# Collect static files if in production and COLLECT_STATIC is true
-if [ "$COLLECT_STATIC" = "true" ]; then
-    log "Collecting static files..."
-    python manage.py collectstatic --noinput --clear
-fi
+# Collect static files — always run so WhiteNoise has the staticfiles dir
+log "Collecting static files..."
+python manage.py collectstatic --noinput --clear
 
 log "Starting application..."
 echo ""
