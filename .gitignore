@@ -44,6 +44,11 @@ railway_services_env/
 # === Misc tracked by mistake ===
 entrprise_service/
 tatus
+<<<<<<< HEAD
+.kiro
+apps/hris/leave_management/fonts/*.ttf
+=======
 
 # === Kiro ===
 .kiro/
+>>>>>>> main

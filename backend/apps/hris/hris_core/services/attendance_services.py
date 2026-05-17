@@ -1,6 +1,4 @@
 import logging
-
-from django.core.management.commands import check
 from django.db import transaction
 from apps.hris.hris_core.models.attendance import AttendanceRecord
 

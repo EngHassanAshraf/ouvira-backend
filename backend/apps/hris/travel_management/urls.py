@@ -1,12 +1,7 @@
-from django.urls import path
-from apps.hris.travel_management.views import (
-    TravelRequestListCreateApiView,
-    TravelRequestDetailApiView,
-)
+from django.urls import path, include
 
 app_name = "travel"
 
 urlpatterns = [
-    path("travel-requests/",          TravelRequestListCreateApiView.as_view(), name="travel-request-list"),
-    path("travel-requests/<int:pk>/",  TravelRequestDetailApiView.as_view(),    name="travel-request-detail"),
+    path("", include("apps.hris.travel_management.api.urls")),
 ]
