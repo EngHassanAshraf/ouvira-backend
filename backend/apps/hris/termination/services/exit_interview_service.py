@@ -10,8 +10,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 from apps.hris.termination.models import ExitInterview, TerminationRequest
-from apps.audit.services import log_activity
-
+from apps.hris.termination.services.utils import log_activity
 
 class ExitInterviewService:
     """
@@ -189,48 +188,48 @@ class ExitInterviewService:
         exit_interview.reason_details = reason_details or ""
 
         # Satisfaction ratings
-        # Qoniqish reyting
+        # Qoniqish reytinglari
 
 
-lari
-exit_interview.overall_satisfaction = overall_satisfaction
-exit_interview.job_satisfaction = job_satisfaction
-exit_interview.manager_satisfaction = manager_satisfaction
-exit_interview.team_satisfaction = team_satisfaction
-exit_interview.compensation_satisfaction = compensation_satisfaction
-exit_interview.work_environment_satisfaction = work_environment_satisfaction
 
-# Open-ended feedback
-# Ochiq javob
-exit_interview.what_did_you_like = what_did_you_like or ""
-exit_interview.what_to_improve = what_to_improve or ""
-exit_interview.would_recommend = would_recommend
-exit_interview.would_return = would_return
-exit_interview.additional_comments = additional_comments or ""
+        exit_interview.overall_satisfaction = overall_satisfaction
+        exit_interview.job_satisfaction = job_satisfaction
+        exit_interview.manager_satisfaction = manager_satisfaction
+        exit_interview.team_satisfaction = team_satisfaction
+        exit_interview.compensation_satisfaction = compensation_satisfaction
+        exit_interview.work_environment_satisfaction = work_environment_satisfaction
 
-# HR internal
-# HR ichki
-exit_interview.hr_notes = hr_notes or ""
-exit_interview.action_items = action_items or ""
+        # Open-ended feedback
+        # Ochiq javob
+        exit_interview.what_did_you_like = what_did_you_like or ""
+        exit_interview.what_to_improve = what_to_improve or ""
+        exit_interview.would_recommend = would_recommend
+        exit_interview.would_return = would_return
+        exit_interview.additional_comments = additional_comments or ""
 
-exit_interview.save()
+        # HR internal
+        # HR ichki
+        exit_interview.hr_notes = hr_notes or ""
+        exit_interview.action_items = action_items or ""
 
-# Log activity
-log_activity(
-    user=conducted_by,
-    action="EXIT_INTERVIEW_COMPLETED",
-    model_name="ExitInterview",
-    object_id=exit_interview.id,
-    changes={
-        "employee": exit_interview.employee.full_name,
-        "conducted_date": str(exit_interview.conducted_date),
-        "primary_reason": primary_reason,
-        "overall_satisfaction": overall_satisfaction,
-        "would_recommend": would_recommend
-    }
-)
+        exit_interview.save()
 
-return exit_interview
+        # Log activity
+        log_activity(
+            user=conducted_by,
+            action="EXIT_INTERVIEW_COMPLETED",
+            model_name="ExitInterview",
+            object_id=exit_interview.id,
+            changes={
+                "employee": exit_interview.employee.full_name,
+                "conducted_date": str(exit_interview.conducted_date),
+                "primary_reason": primary_reason,
+                "overall_satisfaction": overall_satisfaction,
+                "would_recommend": would_recommend
+            }
+        )
+
+        return exit_interview
 
 
 @staticmethod

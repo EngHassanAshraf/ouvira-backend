@@ -1,7 +1,5 @@
 """
 Termination Module Services
-
-Exports all service classes for termination management
 """
 
 from .resignation_service import ResignationService

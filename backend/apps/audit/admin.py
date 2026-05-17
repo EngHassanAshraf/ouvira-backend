@@ -1,4 +1,4 @@
-# user_activity/admin.py
+# user_activity/admin_enhanced.py
 from django.contrib import admin
 from .models import ActivityLog, Notification, DateDim, SecurityAuditLog
 # from apps.identity.account.models.user import RoleChangeLog

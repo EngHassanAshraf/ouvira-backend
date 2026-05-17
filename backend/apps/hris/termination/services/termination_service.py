@@ -11,8 +11,7 @@ from django.core.exceptions import ValidationError
 from datetime import timedelta
 
 from apps.hris.termination.models import TerminationRequest
-from apps.audit.services import log_activity
-
+from apps.hris.termination.services.utils import log_activity
 
 class TerminationService:
     """

@@ -10,8 +10,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 from apps.hris.termination.models import TerminationWarning, TerminationRequest
-from apps.audit.services import log_activity
-
+from apps.hris.termination.services.utils import log_activity
 
 class WarningService:
     """
