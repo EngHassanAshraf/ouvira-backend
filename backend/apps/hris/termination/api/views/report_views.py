@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from apps.hris.termination.selectors import TerminationSelector
+from apps.access_control.permissions.HasModulePermission import make_permission
 
 
 class TerminationStatisticsView(APIView):
@@ -19,7 +20,7 @@ class TerminationStatisticsView(APIView):
 
     GET: Get statistics with optional date filters
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_statistics")]
 
     def get(self, request):
         """Get termination statistics / Tugatish statistikasini olish"""
@@ -52,7 +53,7 @@ class ExitInterviewInsightsView(APIView):
 
     GET: Get insights with optional date filters
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_exit_insights")]
 
     def get(self, request):
         """Get exit interview insights / Chiqish suhbati tushunchalarini olish"""
@@ -85,7 +86,7 @@ class SettlementSummaryView(APIView):
 
     GET: Get summary with optional date filters
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_settlement_summary")]
 
     def get(self, request):
         """Get settlement summary / Hisob-kitob xulosasini olish"""
@@ -118,7 +119,7 @@ class PendingApprovalsView(APIView):
 
     GET: Get pending resignations and terminations
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_pending_approvals")]
 
     def get(self, request):
         """Get pending approvals / Kutilayotgan tasdiqlashlarni olish"""

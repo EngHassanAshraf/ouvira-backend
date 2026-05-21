@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from apps.access_control.permissions.HasModulePermission import make_permission
 
 from apps.hris.termination.models import TerminationRequest, TerminationWarning
 from apps.hris.termination.services import ResignationService
@@ -22,6 +23,7 @@ from apps.hris.termination.serializers import (
 )
 
 
+
 class MyResignationView(APIView):
     """
     Employee can view and submit their resignation
@@ -30,8 +32,7 @@ class MyResignationView(APIView):
     GET: View my active resignation
     POST: Submit new resignation
     """
-    permission_classes = [IsAuthenticated]
-
+    permission_classes = [IsAuthenticated, make_permission("termination.view_own")]
     def get(self, request):
         """Get my active resignation / Mening faol iste'fomni olish"""
         employee = request.user.employee
@@ -82,7 +83,7 @@ class MyResignationWithdrawView(APIView):
 
     POST: Withdraw resignation
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.withdraw_resignation")]
 
     def post(self, request, resignation_id):
         """Withdraw resignation / Iste'foni qaytarib olish"""
@@ -125,7 +126,7 @@ class MyTerminationHistoryView(APIView):
 
     GET: List all my termination requests
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_own")]
 
     def get(self, request):
         """Get my termination history / Mening tugatish tarixim"""
@@ -151,7 +152,7 @@ class MyTerminationDetailView(APIView):
 
     GET: View termination details
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_own")]
 
     def get(self, request, termination_id):
         """Get termination details / Tugatish tafsilotlarini olish"""
@@ -186,7 +187,7 @@ class MyWarningsView(APIView):
 
     GET: List my warnings
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_own")]
 
     def get(self, request):
         """Get my warnings / Mening ogohlantirishlarim"""

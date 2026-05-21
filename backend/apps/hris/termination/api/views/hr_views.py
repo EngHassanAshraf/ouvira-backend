@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from apps.access_control.permissions.HasModulePermission import make_permission
 
 from apps.hris.termination.models import (
     TerminationRequest,
@@ -37,7 +38,7 @@ class TerminationListView(APIView):
 
     GET: List all terminations
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_all")]
 
     def get(self, request):
         """Get all terminations / Barcha tugatishlar"""
@@ -72,7 +73,7 @@ class ResignationApproveManagerView(APIView):
 
     POST: Approve resignation
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.approve_resignation_manager")]
 
     def post(self, request, resignation_id):
         """Manager approve resignation"""
@@ -107,7 +108,7 @@ class ResignationApproveGMView(APIView):
 
     POST: GM approve resignation
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.approve_resignation_gm")]
 
     def post(self, request, resignation_id):
         """GM approve resignation"""
@@ -142,7 +143,7 @@ class ResignationRejectView(APIView):
 
     POST: Reject resignation
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.reject_resignation")]
 
     def post(self, request, resignation_id):
         """Reject resignation"""
@@ -172,7 +173,7 @@ class ResignationRejectView(APIView):
 
 class BehavioralTerminationCreateView(APIView):
     """HR initiates behavioral termination"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.initiate_behavioral")]
 
     def post(self, request):
         initiated_by = request.user.employee
@@ -197,7 +198,7 @@ class BehavioralTerminationCreateView(APIView):
 
 class PerformanceTerminationCreateView(APIView):
     """HR initiates performance termination"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.initiate_performance")]
 
     def post(self, request):
         initiated_by = request.user.employee
@@ -224,7 +225,7 @@ class PerformanceTerminationCreateView(APIView):
 
 class WarningListView(APIView):
     """HR views all warnings"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_warnings")]
 
     def get(self, request):
         company = request.user.employee.company
@@ -275,7 +276,7 @@ class AbsenceWarningCreateView(APIView):
 
 class PerformanceWarningCreateView(APIView):
     """HR issues performance warning"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.issue_performance_warning")]
 
     def post(self, request):
         issued_by = request.user.employee
@@ -301,7 +302,7 @@ class PerformanceWarningCreateView(APIView):
 
 class WarningEscalateView(APIView):
     """HR escalates final warning to termination"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.escalate_warning")]
 
     def post(self, request, warning_id):
         escalated_by = request.user.employee
@@ -328,7 +329,7 @@ class WarningEscalateView(APIView):
 
 class SettlementListView(APIView):
     """HR views all settlements"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_settlements")]
 
     def get(self, request):
         company = request.user.employee.company
@@ -345,7 +346,7 @@ class SettlementListView(APIView):
 
 class SettlementCreateView(APIView):
     """HR creates settlement"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.create_settlement")]
 
     def post(self, request):
         calculated_by = request.user.employee
@@ -372,7 +373,7 @@ class SettlementCreateView(APIView):
 
 class SettlementApproveView(APIView):
     """HR/Manager approves settlement"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.approve_settlement")]
 
     def post(self, request, settlement_id):
         approved_by = request.user.employee
@@ -393,7 +394,7 @@ class SettlementApproveView(APIView):
 
 class SettlementPaymentView(APIView):
     """Finance processes settlement payment"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.process_payment")]
 
     def post(self, request, settlement_id):
         paid_by = request.user.employee
@@ -425,7 +426,7 @@ class SettlementPaymentView(APIView):
 
 class ExitInterviewListView(APIView):
     """HR views all exit interviews"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.view_exit_interviews")]
 
     def get(self, request):
         company = request.user.employee.company
@@ -442,7 +443,7 @@ class ExitInterviewListView(APIView):
 
 class ExitInterviewScheduleView(APIView):
     """HR schedules exit interview"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.schedule_exit_interview")]
 
     def post(self, request):
         scheduled_by = request.user.employee
@@ -467,7 +468,7 @@ class ExitInterviewScheduleView(APIView):
 
 class ExitInterviewConductView(APIView):
     """HR conducts exit interview"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, make_permission("termination.conduct_exit_interview")]
 
     def post(self, request, interview_id):
         conducted_by = request.user.employee
